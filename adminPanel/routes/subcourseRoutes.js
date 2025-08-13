@@ -1,0 +1,20 @@
+const express = require('express');
+const router = express.Router();
+const { createSubcourse, getAllSubcourses, updateSubcourse, deleteSubcourse } = require('../controllers/course/subcourseController');
+const { verifyToken } = require('../../middlewares/authMiddleware');
+const multer = require('multer');
+
+
+const upload = multer({ storage: multer.memoryStorage() });
+const uploadFields = upload.fields([
+    { name: 'certificateUrl', maxCount: 1 },
+    { name: 'introVideoUrl', maxCount: 1 }
+]);
+
+// Routes
+router.post('/add-subcourse', verifyToken, uploadFields, createSubcourse);
+router.get('/get-all-subcourses', verifyToken, getAllSubcourses);
+router.put('/update-subcourse/:id', verifyToken, uploadFields, updateSubcourse);
+router.delete("/delete-subcourse/:id", verifyToken, deleteSubcourse)
+
+module.exports = router;
