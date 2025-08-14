@@ -6,6 +6,9 @@ const adminauthRoutes = require("./adminPanel/routes/auth");
 const courseRoutes = require("./adminPanel/routes/courseRoutes");
 const subcourseRoutes = require("./adminPanel/routes/subcourseRoutes");
 const lessonRoutes = require("./adminPanel/routes/lessonRoutes");
+const profileRoutes = require("./userPanel/routes/profile");
+const userSideCourseRoutes = require("./userPanel/routes/course");
+const favouriteCourseRoutes = require("./userPanel/routes/favouriteCourse");
 require('dotenv').config();
 
 const app = express();
@@ -22,6 +25,9 @@ connectDB();
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use("/api/user/profile",profileRoutes);
+app.use("/api/user/course",userSideCourseRoutes);
+app.use('/api/user/favourite',favouriteCourseRoutes)
 
 
 app.use("/api/admin/auth",adminauthRoutes)

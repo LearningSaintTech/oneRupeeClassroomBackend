@@ -47,8 +47,15 @@ const lessonSchema = new mongoose.Schema({
         required: true
     },
     duration: {
-        type: String, 
+        type: String,
         required: true
+    },
+    LiveStatus: {
+        type: Boolean,
+        default: false
+    },
+    thumbnailImageUrl:{
+        type:String
     }
 
 });

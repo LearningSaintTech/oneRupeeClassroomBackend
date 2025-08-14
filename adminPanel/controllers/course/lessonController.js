@@ -4,6 +4,9 @@ const Course = require('../../../course/models/course');
 const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
 const { apiResponse } = require("../../../utils/apiResponse");
 const mongoose = require('mongoose');
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs').promises;
+const path = require('path');
 
 // Helper function to calculate duration in minutes
 const calculateDurationInMinutes = (startTime, endTime) => {
@@ -57,6 +60,55 @@ const parseDurationToMinutes = (durationStr) => {
         return 0;
     }
 };
+
+const generateThumbnail = async (videoBuffer, outputFileName) => {
+    const tempVideoPath = path.join(__dirname, `temp_${Date.now()}_video.mp4`);
+    const tempThumbnailPath = path.join(__dirname, `temp_${Date.now()}_thumbnail.jpg`);
+
+    try {
+        // Validate video buffer
+        if (!Buffer.isBuffer(videoBuffer)) {
+            throw new Error('Invalid video buffer');
+        }
+
+        // Write video buffer to temporary file
+        await fs.writeFile(tempVideoPath, videoBuffer);
+
+        // Generate thumbnail using fluent-ffmpeg
+        await new Promise((resolve, reject) => {
+            ffmpeg(tempVideoPath)
+                .screenshots({
+                    count: 1,
+                    folder: path.dirname(tempThumbnailPath),
+                    filename: path.basename(tempThumbnailPath),
+                    size: '320x240', // Thumbnail size
+                    timestamps: ['2'], // Take screenshot at 1 second
+                })
+                .on('end', resolve)
+                .on('error', (err) => reject(new Error(`FFmpeg error: ${err.message}`)));
+        });
+
+        // Read the generated thumbnail
+        const thumbnailBuffer = await fs.readFile(tempThumbnailPath);
+
+        // Upload thumbnail to S3
+        const thumbnailFileName = `lessons/thumbnails/${Date.now()}_${outputFileName}.jpg`;
+        const thumbnailUrl = await uploadImage({ buffer: thumbnailBuffer, mimetype: 'image/jpeg', originalname: `${outputFileName}.jpg` }, thumbnailFileName);
+
+        return thumbnailUrl;
+    } catch (error) {
+        throw new Error(`Failed to generate thumbnail: ${error.message}`);
+    } finally {
+        // Clean up temporary files
+        try {
+            await fs.unlink(tempVideoPath).catch(() => {});
+            await fs.unlink(tempThumbnailPath).catch(() => {});
+        } catch (cleanupError) {
+            console.error('Error cleaning up temporary files:', cleanupError.message);
+        }
+    }
+};
+
 
 // Create a new lesson (POST)
 exports.createLesson = async (req, res) => {
@@ -166,6 +218,19 @@ exports.createLesson = async (req, res) => {
         const introVideoFileName = `lessons/videos/${Date.now()}_${introVideoFile.originalname}`;
         const introVideoUrl = await uploadImage(introVideoFile, introVideoFileName);
 
+        // Generate thumbnail from intro video
+        let thumbnailUrl;
+        try {
+            thumbnailUrl = await generateThumbnail(introVideoFile.buffer, `thumbnail_${lessonName}`);
+        } catch (thumbnailError) {
+            console.error('Thumbnail generation failed:', thumbnailError.message);
+            return apiResponse(res, {
+                success: false,
+                message: `Failed to generate thumbnail: ${thumbnailError.message}`,
+                statusCode: 500,
+            });
+        }
+
         // Create new lesson
         const lesson = new Lesson({
             adminId: req.userId,
@@ -179,7 +244,8 @@ exports.createLesson = async (req, res) => {
             recordedVideoLink,
             introVideoUrl,
             description,
-            duration
+            duration,
+            thumbnailImageUrl: thumbnailUrl
         });
 
         await lesson.save();

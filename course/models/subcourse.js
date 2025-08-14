@@ -54,6 +54,17 @@ const subcourseSchema = new mongoose.Schema({
     rating: {
         type: Number,
         default: 0
+    },
+    LiveStatus:{
+        type:Boolean,
+        default:false
+    },
+     thumbnailImageUrl:{
+        type:String
+    },
+    isbestSeller:{
+        type:Boolean,
+        default:false
     }
 
 }, { timestamps: true });

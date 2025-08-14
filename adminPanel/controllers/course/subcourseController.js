@@ -4,6 +4,57 @@ const Lesson = require("../../../course/models/lesson");
 const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
 const { apiResponse } = require("../../../utils/apiResponse");
 const mongoose = require('mongoose');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const fs = require('fs').promises;
+const path = require('path');
+
+
+// Set FFmpeg path programmatically
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+const generateThumbnail = async (videoBuffer, outputFileName) => {
+    const tempVideoPath = path.join(__dirname, `temp_${Date.now()}_video.mp4`);
+    const tempThumbnailPath = path.join(__dirname, `temp_${Date.now()}_thumbnail.jpg`);
+
+    try {
+        // Write video buffer to temporary file
+        await fs.writeFile(tempVideoPath, videoBuffer);
+
+        // Generate thumbnail using fluent-ffmpeg
+        await new Promise((resolve, reject) => {
+            ffmpeg(tempVideoPath)
+                .screenshots({
+                    count: 1,
+                    folder: path.dirname(tempThumbnailPath),
+                    filename: path.basename(tempThumbnailPath),
+                    size: '320x240', // Thumbnail size
+                    timestamps: ['2'], // Take screenshot at 1 second
+                })
+                .on('end', resolve)
+                .on('error', reject);
+        });
+
+        // Read the generated thumbnail
+        const thumbnailBuffer = await fs.readFile(tempThumbnailPath);
+
+        // Upload thumbnail to S3
+        const thumbnailFileName = `subcourses/thumbnails/${Date.now()}_${outputFileName}.jpg`;
+        const thumbnailUrl = await uploadImage({ buffer: thumbnailBuffer, mimetype: 'image/jpeg', originalname: `${outputFileName}.jpg` }, thumbnailFileName);
+
+        return thumbnailUrl;
+    } catch (error) {
+        throw new Error(`Failed to generate thumbnail: ${error.message}`);
+    } finally {
+        // Clean up temporary files
+        try {
+            await fs.unlink(tempVideoPath).catch(() => {});
+            await fs.unlink(tempThumbnailPath).catch(() => {});
+        } catch (cleanupError) {
+            console.error('Error cleaning up temporary files:', cleanupError.message);
+        }
+    }
+};
 
 // Create a new subcourse (POST)
 exports.createSubcourse = async (req, res) => {
@@ -21,7 +72,7 @@ exports.createSubcourse = async (req, res) => {
         const certificateFile = req.files?.certificateUrl?.[0];
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
-        console.log("222", certificateFile, introVideoFile)
+        console.log("Uploaded files:", { certificateFile, introVideoFile });
 
         // Validate required fields
         if (!courseId || !subcourseName || !subCourseDescription || !certificateFile || !certificatePrice || !certificateDescription || !introVideoFile || !totalLessons) {
@@ -68,6 +119,9 @@ exports.createSubcourse = async (req, res) => {
         const certificateUrl = await uploadImage(certificateFile, certificateFileName);
         const introVideoUrl = await uploadImage(introVideoFile, introVideoFileName);
 
+        // Generate thumbnail from intro video
+        const thumbnailUrl = await generateThumbnail(introVideoFile.buffer, `thumbnail_${subcourseName}`);
+
         // Create new subcourse
         const subcourse = new Subcourse({
             adminId: req.userId, // From auth middleware
@@ -80,7 +134,8 @@ exports.createSubcourse = async (req, res) => {
             certificateDescription,
             introVideoUrl,
             totalLessons,
-            totalDuration
+            totalDuration,
+            thumbnailImageUrl: thumbnailUrl
         });
 
         await subcourse.save();
