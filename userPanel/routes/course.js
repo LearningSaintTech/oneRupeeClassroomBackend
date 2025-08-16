@@ -1,5 +1,5 @@
 const express = require('express');
-const {getAllSubcourses,getPopularCourses,getNewestCourses,getSubcourseById,getLessonById,getAllCourses} = require('../controllers/course/courseController');
+const {getAllSubcourses,getPopularCourses,getNewestCourses,getSubcourseById,getLessonById,getAllCourses,getUserPurchasedSubcourses,getEnrolledUsersBySubcourse} = require('../controllers/course/courseController');
 const {verifyToken} = require("../../middlewares/authMiddleware");
 
 
@@ -14,6 +14,10 @@ router.get("/getsubcourseById/:id",verifyToken,getSubcourseById)
 router.get("/getLessonById/:id",verifyToken,getLessonById)
 
 router.get("/getAllCourses",verifyToken,getAllCourses)
+
+router.get("/get-purchased-course",verifyToken,getUserPurchasedSubcourses)
+
+router.get("/get-enrolled-students/:id",verifyToken,getEnrolledUsersBySubcourse)
 
 
 

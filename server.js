@@ -9,6 +9,11 @@ const lessonRoutes = require("./adminPanel/routes/lessonRoutes");
 const profileRoutes = require("./userPanel/routes/profile");
 const userSideCourseRoutes = require("./userPanel/routes/course");
 const favouriteCourseRoutes = require("./userPanel/routes/favouriteCourse");
+const coursePurchaseRoutes = require("./userPanel/routes/userbuyCourse");
+const markCompleted = require("./userPanel/routes/markCompleted");
+const userCourseRoutes = require("./userPanel/routes/userCourses");
+const { applyTimestamps } = require('./course/models/subcourse');
+
 require('dotenv').config();
 
 const app = express();
@@ -26,8 +31,11 @@ connectDB();
 // Routes
 app.use('/api/auth', authRoutes);
 app.use("/api/user/profile",profileRoutes);
-app.use("/api/user/course",userSideCourseRoutes);
+app.use("/api/user/course",userSideCourseRoutes,userCourseRoutes);
 app.use('/api/user/favourite',favouriteCourseRoutes)
+app.use('/api/user/buy',coursePurchaseRoutes);
+app.use("/api/user/mark",markCompleted);
+
 
 
 app.use("/api/admin/auth",adminauthRoutes)

@@ -20,14 +20,22 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    role:{
-        type:String,
-        default:"user"
+    role: {
+        type: String,
+        default: "user"
     },
-    isEmailVerified:{
-        type:Boolean,
-        default:false
-    }
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    purchasedsubCourses:
+        [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "course"
+            }
+
+        ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

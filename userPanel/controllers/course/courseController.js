@@ -1,93 +1,96 @@
 const mongoose = require('mongoose');
-const Subcourse = require('../../../course/models/subcourse'); 
+const Subcourse = require('../../../course/models/subcourse');
 const { apiResponse } = require('../../../utils/apiResponse');
 const Lesson = require("../../../course/models/lesson");
 const Course = require("../../../course/models/course");
+const UserCourse = require("../../models/UserCourse/userCourse");
+const User = require("../../models/Auth/Auth");
+const UserProfile = require("../../models/Profile/userProfile");
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
-  try {
-    // Fetch only required fields from Subcourse collection
-    const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons rating price');
+    try {
+        // Fetch only required fields from Subcourse collection
+        const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons rating price');
 
-    return apiResponse(res, {
-      success: true,
-      message: 'Subcourses retrieved successfully',
-      data: subcourses,
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error fetching subcourses:', error);
-    return apiResponse(res, {
-      success: false,
-      message: `Failed to fetch subcourses: ${error.message}`,
-      statusCode: 500,
-    });
-  }
+        return apiResponse(res, {
+            success: true,
+            message: 'Subcourses retrieved successfully',
+            data: subcourses,
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error fetching subcourses:', error);
+        return apiResponse(res, {
+            success: false,
+            message: `Failed to fetch subcourses: ${error.message}`,
+            statusCode: 500,
+        });
+    }
 };
 
 
 //get popular courses 
 
 exports.getPopularCourses = async (req, res) => {
-  try {
-    const subcourses = await Subcourse.find()
-      .sort({ totalStudentsEnrolled: -1 }); // Descending order
+    try {
+        const subcourses = await Subcourse.find()
+            .sort({ totalStudentsEnrolled: -1 }); // Descending order
 
-    const popularCourses = subcourses.map(subcourse => ({
-      subcourseName: subcourse.subcourseName,
-      thumbnailImageUrl: subcourse.thumbnailImageUrl,
-      totalLessons: subcourse.totalLessons,
-      rating: subcourse.rating,
-      totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
-      price: subcourse.price
-    }));
+        const popularCourses = subcourses.map(subcourse => ({
+            subcourseName: subcourse.subcourseName,
+            thumbnailImageUrl: subcourse.thumbnailImageUrl,
+            totalLessons: subcourse.totalLessons,
+            rating: subcourse.rating,
+            totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+            price: subcourse.price
+        }));
 
-    return apiResponse(res, {
-      success: true,
-      message: 'Popular courses retrieved successfully',
-      data: popularCourses,
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error fetching popular courses:', error);
-    return apiResponse(res, {
-      success: false,
-      message: `Failed to fetch popular courses: ${error.message}`,
-      statusCode: 500,
-    });
-  }
+        return apiResponse(res, {
+            success: true,
+            message: 'Popular courses retrieved successfully',
+            data: popularCourses,
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error fetching popular courses:', error);
+        return apiResponse(res, {
+            success: false,
+            message: `Failed to fetch popular courses: ${error.message}`,
+            statusCode: 500,
+        });
+    }
 };
 
 //get newest courses
 
 exports.getNewestCourses = async (req, res) => {
-  try {
-    const subcourses = await Subcourse.find()
-      .sort({ createdAt: -1 }); // Descending order (newest first)
+    try {
+        const subcourses = await Subcourse.find()
+            .sort({ createdAt: -1 }); // Descending order (newest first)
 
-    const newestCourses = subcourses.map(subcourse => ({
-      subcourseName: subcourse.subcourseName,
-      thumbnailImageUrl: subcourse.thumbnailImageUrl,
-      totalLessons: subcourse.totalLessons,
-      rating: subcourse.rating,
-      price: subcourse.price
-    }));
+        const newestCourses = subcourses.map(subcourse => ({
+            subcourseName: subcourse.subcourseName,
+            thumbnailImageUrl: subcourse.thumbnailImageUrl,
+            totalLessons: subcourse.totalLessons,
+            rating: subcourse.rating,
+            price: subcourse.price
+        }));
 
-    return apiResponse(res, {
-      success: true,
-      message: 'Newest courses retrieved successfully',
-      data: newestCourses,
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error fetching newest courses:', error);
-    return apiResponse(res, {
-      success: false,
-      message: `Failed to fetch newest courses: ${error.message}`,
-      statusCode: 500,
-    });
-  }
+        return apiResponse(res, {
+            success: true,
+            message: 'Newest courses retrieved successfully',
+            data: newestCourses,
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error fetching newest courses:', error);
+        return apiResponse(res, {
+            success: false,
+            message: `Failed to fetch newest courses: ${error.message}`,
+            statusCode: 500,
+        });
+    }
 };
 
 
@@ -214,69 +217,88 @@ exports.getSubcourseById = async (req, res) => {
 
 //get lesson by Id
 exports.getLessonById = async (req, res) => {
-    try {
-        const lessonId = req.params.id;
+  try {
+    const userId = req.userId;
+    const lessonId = req.params.id;
 
-        // Validate lessonId
-        if (!mongoose.Types.ObjectId.isValid(lessonId)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid lesson ID',
-                statusCode: 400,
-            });
-        }
-
-        // Find lesson
-        const lesson = await Lesson.findById(lessonId);
-
-        if (!lesson) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Lesson not found',
-                statusCode: 404,
-            });
-        }
-
-        // Get current date and time in IST
-        const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-        const currentDateTime = new Date(now);
-        const lessonDate = new Date(lesson.date);
-        lessonDate.setHours(parseInt(lesson.startTime.split(':')[0]), parseInt(lesson.startTime.split(':')[1]), 0, 0);
-        const lessonEndTime = new Date(lessonDate);
-        lessonEndTime.setHours(parseInt(lesson.endTime.split(':')[0]), parseInt(lesson.endTime.split(':')[1]), 0, 0);
-
-        // Update LiveStatus if current time is between startTime and endTime on the lesson date
-        let liveStatus = lesson.LiveStatus;
-        if (currentDateTime >= lessonDate && currentDateTime <= lessonEndTime) {
-            liveStatus = true;
-        }
-
-        // Prepare response data
-        const responseData = {
-            introVideoUrl: lesson.introVideoUrl,
-            lessonName:lesson.lessonName,
-            classLink: lesson.classLink,
-            desc: lesson.description,
-            duration: lesson.duration,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            LiveStatus: liveStatus
-        };
-
-        return apiResponse(res, {
-            success: true,
-            message: 'Lesson details retrieved successfully',
-            data: responseData,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching lesson by ID:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch lesson: ${error.message}`,
-            statusCode: 500,
-        });
+    // Validate lessonId and userId
+    if (!mongoose.Types.ObjectId.isValid(lessonId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid lesson ID or user ID',
+        statusCode: 400,
+      });
     }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Find lesson
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Lesson not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if user has purchased the subcourse associated with the lesson
+    if (!user.purchasedsubCourses.includes(lesson.subcourseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Access denied: Subcourse not purchased',
+        statusCode: 403,
+      });
+    }
+
+    // Get current date and time in IST
+    const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    const currentDateTime = new Date(now);
+    const lessonDate = new Date(lesson.date);
+    lessonDate.setHours(parseInt(lesson.startTime.split(':')[0]), parseInt(lesson.startTime.split(':')[1]), 0, 0);
+    const lessonEndTime = new Date(lessonDate);
+    lessonEndTime.setHours(parseInt(lesson.endTime.split(':')[0]), parseInt(lesson.endTime.split(':')[1]), 0, 0);
+
+    // Update LiveStatus if current time is between startTime and endTime on the lesson date
+    let liveStatus = lesson.LiveStatus;
+    if (currentDateTime >= lessonDate && currentDateTime <= lessonEndTime) {
+      liveStatus = true;
+    }
+
+    // Prepare response data
+    const responseData = {
+      introVideoUrl: lesson.introVideoUrl,
+      lessonName: lesson.lessonName,
+      classLink: lesson.classLink,
+      desc: lesson.description,
+      duration: lesson.duration,
+      startTime: lesson.startTime,
+      endTime: lesson.endTime,
+      LiveStatus: liveStatus,
+    };
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Lesson details retrieved successfully',
+      data: responseData,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching lesson by ID:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch lesson: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 //get-all-courses
@@ -323,4 +345,148 @@ exports.getAllCourses = async (req, res) => {
             statusCode: 500,
         });
     }
+};
+
+
+//get purchased courses
+
+exports.getUserPurchasedSubcourses = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid userId',
+        statusCode: 400,
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId).select('purchasedsubCourses');
+    if (!user) {
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // If no purchased subcourses, return empty array
+    if (!user.purchasedsubCourses || user.purchasedsubCourses.length === 0) {
+      return apiResponse(res, {
+        success: true,
+        message: 'No purchased subcourses found',
+        data: [],
+        statusCode: 200,
+      });
+    }
+
+    // Fetch purchased subcourses with required fields
+    const subcourses = await Subcourse.find({
+      _id: { $in: user.purchasedsubCourses },
+    }).select('subcourseName totalLessons thumbnailImageUrl');
+
+    // Fetch progress from UserCourse for each purchased subcourse
+    const userCourses = await UserCourse.find({
+      userId,
+      subcourseId: { $in: user.purchasedsubCourses },
+    }).select('subcourseId progress');
+
+    // Map subcourses to include progress
+    const result = subcourses.map(subcourse => {
+      const userCourse = userCourses.find(uc => uc.subcourseId.toString() === subcourse._id.toString());
+      return {
+        subcourseId: subcourse._id,
+        subcourseName: subcourse.subcourseName,
+        totalLessons: subcourse.totalLessons,
+        thumbnailImageUrl: subcourse.thumbnailImageUrl,
+        progress: userCourse ? userCourse.progress : '0%',
+      };
+    });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Purchased subcourses retrieved successfully',
+      data: result,
+      statusCode: 200,
+    });
+  } catch (error) {
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch purchased subcourses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+//get students
+exports.getEnrolledUsersBySubcourse = async (req, res) => {
+  try {
+    const subcourseId = req.params.id;
+
+    // Validate subcourseId
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    // Check if subcourse exists
+    const subcourse = await Subcourse.findById(subcourseId);
+    if (!subcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    // Find users who have purchased the subcourse
+    const users = await User.find({
+      purchasedsubCourses: subcourseId,
+    }).select('fullName');
+
+    // If no users have purchased the subcourse, return empty array
+    if (!users || users.length === 0) {
+      return apiResponse(res, {
+        success: true,
+        message: 'No users enrolled in this subcourse',
+        data: [],
+        statusCode: 200,
+      });
+    }
+
+    // Fetch profile images from UserProfile
+    const userIds = users.map(user => user._id);
+    const userProfiles = await UserProfile.find({
+      userId: { $in: userIds },
+    }).select('userId profileImageUrl');
+
+    // Map users to include fullName and profileImageUrl
+    const result = users.map(user => {
+      const profile = userProfiles.find(p => p.userId.toString() === user._id.toString());
+      return {
+        userId: user._id,
+        fullName: user.fullName,
+        profileImageUrl: profile ? profile.profileImageUrl || '' : '',
+      };
+    });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Enrolled users retrieved successfully',
+      data: result,
+      statusCode: 200,
+    });
+  } catch (error) {
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch enrolled users: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };

@@ -1,27 +1,20 @@
 const mongoose = require('mongoose');
 
-const userCourseSchema = new mongoose.Schema({
+const userlessonSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
     },
-    subcourseId: {
+    lessonId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "subcourse",
+        ref: "lesson",
         required: true,
     },
     isCompleted: {
         type: Boolean,
         default:false
-    },
-    progress:{
-        type:String
-    },
-    paymentStatus:{
-        type:Boolean,
-        default:false
     }
 });
 
-module.exports = mongoose.model('userCourse', userCourseSchema);
+module.exports = mongoose.model('userlesson', userlessonSchema);

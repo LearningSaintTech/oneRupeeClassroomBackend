@@ -55,18 +55,34 @@ const subcourseSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    LiveStatus:{
-        type:Boolean,
-        default:false
+    LiveStatus: {
+        type: Boolean,
+        default: false
     },
-     thumbnailImageUrl:{
-        type:String
+    thumbnailImageUrl: {
+        type: String
     },
-    isbestSeller:{
-        type:Boolean,
-        default:false
+    isbestSeller: {
+        type: Boolean,
+        default: false
+    },
+    userRatings: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        rating: {
+            type: Number,
+            required: true,
+            min: 0,
+            max: 5
+        }
+    }],
+    totalRatings: {
+        type: Number,
+        default: 0
     }
-
 }, { timestamps: true });
 
 module.exports = mongoose.model('subcourse', subcourseSchema);
