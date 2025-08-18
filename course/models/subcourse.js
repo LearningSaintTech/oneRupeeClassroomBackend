@@ -51,7 +51,7 @@ const subcourseSchema = new mongoose.Schema({
         type: String,
         default: '0'
     },
-    rating: {
+    avgRating: {
         type: Number,
         default: 0
     },
@@ -65,23 +65,6 @@ const subcourseSchema = new mongoose.Schema({
     isbestSeller: {
         type: Boolean,
         default: false
-    },
-    userRatings: [{
-        userId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            required: true
-        },
-        rating: {
-            type: Number,
-            required: true,
-            min: 0,
-            max: 5
-        }
-    }],
-    totalRatings: {
-        type: Number,
-        default: 0
     }
 }, { timestamps: true });
 

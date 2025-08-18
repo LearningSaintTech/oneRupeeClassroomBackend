@@ -11,7 +11,7 @@ const UserProfile = require("../../models/Profile/userProfile");
 exports.getAllSubcourses = async (req, res) => {
     try {
         // Fetch only required fields from Subcourse collection
-        const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons rating price');
+        const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
 
         return apiResponse(res, {
             success: true,
@@ -41,7 +41,7 @@ exports.getPopularCourses = async (req, res) => {
             subcourseName: subcourse.subcourseName,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             totalLessons: subcourse.totalLessons,
-            rating: subcourse.rating,
+            avgRating: subcourse.avgRating,
             totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
             price: subcourse.price
         }));
@@ -73,7 +73,7 @@ exports.getNewestCourses = async (req, res) => {
             subcourseName: subcourse.subcourseName,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             totalLessons: subcourse.totalLessons,
-            rating: subcourse.rating,
+            avgRating: subcourse.avgRating,
             price: subcourse.price
         }));
 
@@ -142,7 +142,7 @@ exports.getSubcourseById = async (req, res) => {
                     _id: '$_id',
                     introVideoUrl: { $first: '$introVideoUrl' },
                     subcourseName: { $first: '$subcourseName' },
-                    rating: { $first: '$rating' },
+                    avgRating: { $first: '$avgRating' },
                     totalStudentsEnrolled: { $first: '$totalStudentsEnrolled' },
                     totalDuration: { $first: '$totalDuration' },
                     subCourseDescription: { $first: '$subCourseDescription' },
@@ -154,7 +154,7 @@ exports.getSubcourseById = async (req, res) => {
                 $project: {
                     introVideoUrl: 1,
                     subcourseName: 1,
-                    rating: 1,
+                    avgRating: 1,
                     totalStudentsEnrolled: 1,
                     totalDuration: 1,
                     subCourseDescription: 1,

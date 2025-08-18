@@ -12,7 +12,9 @@ const favouriteCourseRoutes = require("./userPanel/routes/favouriteCourse");
 const coursePurchaseRoutes = require("./userPanel/routes/userbuyCourse");
 const markCompleted = require("./userPanel/routes/markCompleted");
 const userCourseRoutes = require("./userPanel/routes/userCourses");
-const { applyTimestamps } = require('./course/models/subcourse');
+const ratingRoutes = require("./userPanel/routes/rating");
+const searchRoutes = require("./userPanel/routes/searchCourse");
+
 
 require('dotenv').config();
 
@@ -35,6 +37,8 @@ app.use("/api/user/course",userSideCourseRoutes,userCourseRoutes);
 app.use('/api/user/favourite',favouriteCourseRoutes)
 app.use('/api/user/buy',coursePurchaseRoutes);
 app.use("/api/user/mark",markCompleted);
+app.use("/api/user/rating",ratingRoutes);
+app.use("/api/user/search",searchRoutes)
 
 
 
