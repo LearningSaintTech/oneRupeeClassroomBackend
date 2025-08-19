@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {getUserPurchasedSubcourses,getUserInProgressSubcourses,getUserCompletedSubcourses} = require('../controllers/userCourses/usrCourseController');
+const {getUserPurchasedSubcourses,getUserInProgressSubcourses,getUserCompletedSubcourses} = require('../controllers/userCourses/userCourseController');
 const {verifyToken} = require('../../middlewares/authMiddleware'); 
 
 router.get('/purchased-subcourses', verifyToken, getUserPurchasedSubcourses);

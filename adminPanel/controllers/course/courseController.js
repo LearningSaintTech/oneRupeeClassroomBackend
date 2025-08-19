@@ -216,3 +216,51 @@ exports.deleteCourse = async (req, res) => {
         });
     }
 };
+
+
+exports.searchCourses = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    // Validate search query
+    if (!q || typeof q !== 'string') {
+      return apiResponse(res, {
+        success: false,
+        message: 'Search query is required and must be a string',
+        data: null,
+        statusCode: 400
+      });
+    }
+
+    // Create search regex for case-insensitive partial matching
+    const searchRegex = new RegExp(q.trim(), 'i');
+
+    // Find courses matching the search query
+    const courses = await Course.find({
+      courseName: searchRegex
+    }).sort({ createdAt: -1 });
+
+    // Add SNo to each course
+    const coursesWithSNo = courses.map((course, index) => ({
+      SNo: index + 1,
+      _id: course._id,
+      courseName: course.courseName,
+      CoverImageUrl: course.CoverImageUrl
+    }));
+
+    return apiResponse(res, {
+      success: true,
+      message: `Found ${coursesWithSNo.length} courses matching search query`,
+      data: coursesWithSNo,
+      statusCode: 200
+    });
+  } catch (error) {
+    console.error('Error searching courses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: 'Error searching courses',
+      data: null,
+      statusCode: 500
+    });
+  }
+};

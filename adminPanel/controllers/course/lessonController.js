@@ -609,3 +609,57 @@ exports.deleteLesson = async (req, res) => {
         });
     }
 };
+
+
+
+exports.searchLessons = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    // Validate search query
+    if (!q || typeof q !== 'string') {
+      return apiResponse(res, {
+        success: false,
+        message: 'Search query is required and must be a string',
+        data: null,
+        statusCode: 400,
+      });
+    }
+
+    // Create search regex for case-insensitive partial matching
+    const searchRegex = new RegExp(q.trim(), 'i');
+
+    // Find lessons matching the search query
+    const lessons = await Lesson.find({
+      lessonName: searchRegex,
+    })
+      .populate('courseId', 'courseName')
+      .populate('subcourseId', 'subcourseName')
+      .sort({ createdAt: -1 });
+
+    // Format results with SNo and relevant fields
+    const lessonsWithSNo = lessons.map((lesson, index) => ({
+      SNo: index + 1,
+      lessonId: lesson._id,
+      lessonName: lesson.lessonName,
+      courseName: lesson.courseId?.courseName || 'N/A',
+      subcourseName: lesson.subcourseId?.subcourseName || 'N/A',
+      duration: lesson.duration,
+    }));
+
+    return apiResponse(res, {
+      success: true,
+      message: `Found ${lessonsWithSNo.length} lessons matching search query`,
+      data: lessonsWithSNo,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error searching lessons:', error);
+    return apiResponse(res, {
+      success: false,
+      message: 'Error searching lessons',
+      data: null,
+      statusCode: 500,
+    });
+  }
+};

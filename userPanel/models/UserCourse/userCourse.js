@@ -6,6 +6,11 @@ const userCourseSchema = new mongoose.Schema({
         ref: "User",
         required: true,
     },
+    courseId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "course",
+        required: true,
+    },
     subcourseId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "subcourse",
@@ -13,15 +18,15 @@ const userCourseSchema = new mongoose.Schema({
     },
     isCompleted: {
         type: Boolean,
-        default:false
+        default: false
     },
-    progress:{
-        type:String
+    progress: {
+        type: String
     },
-    paymentStatus:{
-        type:Boolean,
-        default:false
+    paymentStatus: {
+        type: Boolean,
+        default: false
     }
-});
+},{timestamps:true});
 
 module.exports = mongoose.model('userCourse', userCourseSchema);

@@ -3,6 +3,7 @@ const User = require('../../models/Auth/Auth');
 const UserCourse = require('../../models/UserCourse/userCourse'); 
 const Subcourse = require("../../../course/models/subcourse");
 const { apiResponse } = require('../../../utils/apiResponse'); 
+const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 
 // Buy course API
 exports.buyCourse = async (req, res) => {
@@ -48,12 +49,31 @@ exports.buyCourse = async (req, res) => {
       });
     }
 
+    // Check if usermainCourse exists for the user and main course
+    let usermainCourse = await UsermainCourse.findOne({
+      userId,
+      courseId: subcourse.courseId,
+    });
+
+    // If usermainCourse doesn't exist, create a new one
+    if (!usermainCourse) {
+      usermainCourse = new UsermainCourse({
+        userId,
+        courseId: subcourse.courseId,
+        status: 'Course Pending',
+        isCompleted: false,
+        isCertificateDownloaded: false,
+      });
+      await usermainCourse.save();
+    }
+
     // Create or update userCourse entry with paymentStatus set to true
     let userCourse = await UserCourse.findOne({ userId, subcourseId });
-    
+
     if (!userCourse) {
       userCourse = new UserCourse({
         userId,
+        courseId: subcourse.courseId,
         subcourseId,
         paymentStatus: true,
         isCompleted: false,
@@ -78,6 +98,7 @@ exports.buyCourse = async (req, res) => {
       message: 'Subcourse purchased successfully',
       data: {
         userCourse,
+        usermainCourse, // Include usermainCourse in response
         purchasedsubCourses: user.purchasedsubCourses,
         totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
       },

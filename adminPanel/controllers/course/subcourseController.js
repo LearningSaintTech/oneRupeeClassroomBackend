@@ -367,3 +367,60 @@ exports.deleteSubcourse = async (req, res) => {
         });
     }
 };
+
+
+
+exports.searchSubcourses = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    // Validate search query
+    if (!q || typeof q !== 'string') {
+      return apiResponse(res, {
+        success: false,
+        message: 'Search query is required and must be a string',
+        data: null,
+        statusCode: 400,
+      });
+    }
+
+    // Create search regex for case-insensitive partial matching
+    const searchRegex = new RegExp(q.trim(), 'i');
+
+    // Find subcourses matching the search query
+    const subcourses = await Subcourse.find({
+      subcourseName: searchRegex,
+    })
+      .populate('courseId', 'courseName')
+      .sort({ createdAt: -1 });
+
+    // Format results with SNo and relevant fields
+    const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
+      SNo: index + 1,
+      subcourseId: subcourse._id,
+      subcourseName: subcourse.subcourseName,
+      courseName: subcourse.courseId?.courseName || 'N/A',
+      subCourseDescription: subcourse.subCourseDescription,
+      price: subcourse.price,
+      introVideoUrl: subcourse.introVideoUrl,
+      totalLessons: subcourse.totalLessons,
+      totalDuration: subcourse.totalDuration,
+      thumbnailImageUrl: subcourse.thumbnailImageUrl,
+    }));
+
+    return apiResponse(res, {
+      success: true,
+      message: `Found ${subcoursesWithSNo.length} subcourses matching search query`,
+      data: subcoursesWithSNo,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error searching subcourses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: 'Error searching subcourses',
+      data: null,
+      statusCode: 500,
+    });
+  }
+};

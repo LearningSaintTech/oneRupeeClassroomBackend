@@ -14,6 +14,13 @@ const markCompleted = require("./userPanel/routes/markCompleted");
 const userCourseRoutes = require("./userPanel/routes/userCourses");
 const ratingRoutes = require("./userPanel/routes/rating");
 const searchRoutes = require("./userPanel/routes/searchCourse");
+const templateRoutes = require("./adminPanel/routes/template");
+const downloadCertificateRoutes = require("./userPanel/routes/downloadCertificate");
+const dashboardRoutes = require("./adminPanel/routes/dashboard");
+const adminProfileRoutes = require("./adminPanel/routes/profile");
+const enrolledStudentsRoutes = require("./adminPanel/routes/enrolledStudents");
+const totalusersRoutes = require("./adminPanel/routes/users");
+const promoRoutes = require("./Promo/routes/promoRoutes");
 
 
 require('dotenv').config();
@@ -38,7 +45,9 @@ app.use('/api/user/favourite',favouriteCourseRoutes)
 app.use('/api/user/buy',coursePurchaseRoutes);
 app.use("/api/user/mark",markCompleted);
 app.use("/api/user/rating",ratingRoutes);
-app.use("/api/user/search",searchRoutes)
+app.use("/api/user/search",searchRoutes);
+app.use("/api/user/certificate",downloadCertificateRoutes);
+
 
 
 
@@ -46,6 +55,14 @@ app.use("/api/admin/auth",adminauthRoutes)
 app.use("/api/admin/course",courseRoutes)
 app.use("/api/admin/subcourse",subcourseRoutes)
 app.use("/api/admin/lesson",lessonRoutes)
+app.use("/api/admin/template",templateRoutes)
+app.use("/api/admin/stats",dashboardRoutes)
+app.use("/api/admin/students",enrolledStudentsRoutes)
+app.use("/api/admin/profile",adminProfileRoutes)
+app.use("/api/admin/users",totalusersRoutes)
+
+
+app.use("/api/promo",promoRoutes)
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

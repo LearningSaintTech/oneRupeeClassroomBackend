@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const User = require('../../models/Auth/Auth');
 const Lesson = require('../../../course/models/lesson');
 const UserLesson = require('../../models/UserCourse/userLesson');
-const UserCourse = require('../../models/UserCourse/userCourse'); 
-const Subcourse = require('../../../course/models/subcourse'); 
-const { apiResponse } = require('../../../utils/apiResponse'); 
+const UserCourse = require('../../models/UserCourse/userCourse');
+const UsermainCourse = require('../../models/UserCourse/usermainCourse');
+const Subcourse = require('../../../course/models/subcourse');
+const { apiResponse } = require('../../../utils/apiResponse');
 
-// Mark lesson as completed and update subcourse progress
 exports.handleMarkLessonCompleted = async (req, res) => {
   try {
     const userId = req.userId;
@@ -37,7 +37,6 @@ exports.handleMarkLessonCompleted = async (req, res) => {
 
     // Check if lesson exists
     const lesson = await Lesson.findById(lessonId);
-    console.log("22",lesson)
     console.log('handleMarkLessonCompleted - Lesson query result:', lesson ? 'Found' : 'Not found', { lessonId });
     if (!lesson) {
       return apiResponse(res, {
@@ -102,9 +101,9 @@ exports.handleMarkLessonCompleted = async (req, res) => {
       });
     }
 
-    // Calculate progress
+    // Calculate subcourse progress
     const lessons = await Lesson.find({ subcourseId });
-    const completedLessons = await UserLesson.countDocuments({ userId, lessonId, isCompleted: true });
+    const completedLessons = await UserLesson.countDocuments({ userId, lessonId: { $in: lessons.map(l => l._id) }, isCompleted: true });
     const totalLessons = subcourse.totalLessons;
     const progressPercentage = totalLessons > 0 ? ((completedLessons / totalLessons) * 100).toFixed(2) + '%' : '0%';
     console.log('handleMarkLessonCompleted - Progress calculation:', { completedLessons, totalLessons, progressPercentage });
@@ -116,6 +115,34 @@ exports.handleMarkLessonCompleted = async (req, res) => {
     await userCourse.save();
     console.log('handleMarkLessonCompleted - UserCourse saved:', { userCourseId: userCourse._id });
 
+    // Update usermainCourse status
+    const usermainCourse = await UsermainCourse.findOne({ userId, courseId: userCourse.courseId });
+    console.log('handleMarkLessonCompleted - UsermainCourse query result:', usermainCourse ? 'Found' : 'Not found', { userId, courseId: userCourse.courseId });
+    if (!usermainCourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'UsermainCourse not found',
+        statusCode: 404,
+      });
+    }
+
+    // Count total subcourses for the main course and check completion
+    const subcourses = await Subcourse.find({ courseId: userCourse.courseId });
+    const totalSubcourses = subcourses.length;
+    const completedSubcourses = await UserCourse.countDocuments({
+      userId,
+      courseId: userCourse.courseId,
+      isCompleted: true,
+    });
+    console.log('handleMarkLessonCompleted - Subcourse completion check:', { totalSubcourses, completedSubcourses });
+
+    if (completedSubcourses >= totalSubcourses && totalSubcourses > 0) {
+      usermainCourse.isCompleted = true;
+      usermainCourse.status = 'Course Completed';
+      await usermainCourse.save();
+      console.log('handleMarkLessonCompleted - UsermainCourse updated:', { usermainCourseId: usermainCourse._id, isCompleted: usermainCourse.isCompleted, status: usermainCourse.status });
+    }
+
     return apiResponse(res, {
       success: true,
       message: 'Lesson marked as completed and progress updated',
@@ -125,6 +152,11 @@ exports.handleMarkLessonCompleted = async (req, res) => {
           subcourseId,
           progress: userCourse.progress,
           isCompleted: userCourse.isCompleted,
+        },
+        usermainCourse: {
+          courseId: usermainCourse.courseId,
+          isCompleted: usermainCourse.isCompleted,
+          status: usermainCourse.status,
         },
       },
       statusCode: 200,
