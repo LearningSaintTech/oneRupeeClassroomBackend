@@ -59,6 +59,7 @@ exports.getPurchasedMainCourseUsers = async (req, res) => {
       name: item.fullName,
       courseName: item.courseName,
       contact: item.mobileNumber,
+      profileImageUrl :item.profileImageUrl,
       email: item.email || 'N/A',
       status: item.status
     }));
