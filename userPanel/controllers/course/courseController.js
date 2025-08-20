@@ -263,27 +263,28 @@ exports.getLessonById = async (req, res) => {
     // Get current date and time in IST
     const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
     const currentDateTime = new Date(now);
+
+    // Set lesson start and end times
     const lessonDate = new Date(lesson.date);
     lessonDate.setHours(parseInt(lesson.startTime.split(':')[0]), parseInt(lesson.startTime.split(':')[1]), 0, 0);
     const lessonEndTime = new Date(lessonDate);
     lessonEndTime.setHours(parseInt(lesson.endTime.split(':')[0]), parseInt(lesson.endTime.split(':')[1]), 0, 0);
 
-    // Update LiveStatus if current time is between startTime and endTime on the lesson date
-    let liveStatus = lesson.LiveStatus;
-    if (currentDateTime >= lessonDate && currentDateTime <= lessonEndTime) {
-      liveStatus = true;
-    }
+    // Determine live status
+    const isLive = currentDateTime >= lessonDate && currentDateTime <= lessonEndTime;
 
     // Prepare response data
     const responseData = {
       introVideoUrl: lesson.introVideoUrl,
       lessonName: lesson.lessonName,
       classLink: lesson.classLink,
+      recordedVideoLink: lesson.recordedVideoLink,
+      date: lesson.date,
       desc: lesson.description,
       duration: lesson.duration,
       startTime: lesson.startTime,
       endTime: lesson.endTime,
-      LiveStatus: liveStatus,
+      LiveStatus: isLive,
     };
 
     return apiResponse(res, {
