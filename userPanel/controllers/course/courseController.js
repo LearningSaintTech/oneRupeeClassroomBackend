@@ -98,9 +98,12 @@ exports.getNewestCourses = async (req, res) => {
 exports.getSubcourseById = async (req, res) => {
   try {
     const subcourseId = req.params.id;
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching subcourse with ID: ${subcourseId}, User ID: ${userId}`);
 
     // Validate subcourseId
     if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log(`Invalid subcourse ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid subcourse ID',
@@ -108,17 +111,44 @@ exports.getSubcourseById = async (req, res) => {
       });
     }
 
+    // Check payment status if userId is provided
+    let paymentStatus = false;
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Valid userId: ${userId}, checking user...`);
+      const user = await User.findById(userId);
+      if (user) {
+        console.log(`User found: ${userId}, checking purchasedsubCourses...`);
+        // Set paymentStatus to true if subcourseId exists in purchasedsubCourses
+        paymentStatus = user.purchasedsubCourses.some(
+          purchase => {
+            const isMatch = purchase.toString() === subcourseId.toString();
+            console.log(`Checking purchase: ${purchase.toString()}, Match: ${isMatch}`);
+            return isMatch;
+          }
+        );
+        console.log(`Payment status for subcourse ${subcourseId}: ${paymentStatus}`);
+      } else {
+        console.log(`User not found for ID: ${userId}`);
+      }
+    } else {
+      console.log(`Invalid or missing userId: ${userId}`);
+    }
+
     // Fetch the top 5 subcourses by totalStudentsEnrolled to determine best sellers
+    console.log('Fetching top 5 subcourses for best seller threshold...');
     const topSubcourses = await Subcourse.aggregate([
       { $sort: { totalStudentsEnrolled: -1 } },
       { $limit: 5 },
       { $project: { totalStudentsEnrolled: 1 } }
     ]);
+    console.log(`Top subcourses: ${JSON.stringify(topSubcourses)}`);
 
     // Extract the minimum totalStudentsEnrolled among the top 5
     const bestSellerThreshold = topSubcourses.length > 0 ? topSubcourses[topSubcourses.length - 1].totalStudentsEnrolled : 0;
+    console.log(`Best seller threshold: ${bestSellerThreshold}`);
 
     // Aggregation pipeline for the requested subcourse
+    console.log(`Running aggregation pipeline for subcourse: ${subcourseId}`);
     const subcourse = await Subcourse.aggregate([
       {
         $match: { _id: new mongoose.Types.ObjectId(subcourseId) }
@@ -186,12 +216,17 @@ exports.getSubcourseById = async (req, res) => {
               then: true,
               else: false
             }
-          }
+          },
+          paymentStatus: { $literal: paymentStatus } // Add paymentStatus to the response
         }
       }
-    ]).then(results => results[0]); // Get the first (and only) result
+    ]).then(results => {
+      console.log(`Aggregation result: ${JSON.stringify(results[0])}`);
+      return results[0];
+    }); // Get the first (and only) result
 
     if (!subcourse) {
+      console.log(`Subcourse not found for ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
@@ -199,6 +234,7 @@ exports.getSubcourseById = async (req, res) => {
       });
     }
 
+    console.log(`Subcourse details retrieved successfully for ID: ${subcourseId}`);
     return apiResponse(res, {
       success: true,
       message: 'Subcourse details retrieved successfully',
@@ -214,8 +250,6 @@ exports.getSubcourseById = async (req, res) => {
     });
   }
 };
-
-
 //get lesson by Id
 exports.getLessonById = async (req, res) => {
   try {
