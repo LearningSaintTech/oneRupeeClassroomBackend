@@ -9,209 +9,210 @@ const UserProfile = require("../../models/Profile/userProfile");
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
-    try {
-        // Fetch only required fields from Subcourse collection
-        const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+  try {
+    // Fetch only required fields from Subcourse collection
+    const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
 
-        return apiResponse(res, {
-            success: true,
-            message: 'Subcourses retrieved successfully',
-            data: subcourses,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching subcourses:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch subcourses: ${error.message}`,
-            statusCode: 500,
-        });
-    }
+    return apiResponse(res, {
+      success: true,
+      message: 'Subcourses retrieved successfully',
+      data: subcourses,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching subcourses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch subcourses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 
 //get popular courses 
 
 exports.getPopularCourses = async (req, res) => {
-    try {
-        const subcourses = await Subcourse.find()
-            .sort({ totalStudentsEnrolled: -1 }); // Descending order
+  try {
+    const subcourses = await Subcourse.find()
+      .sort({ totalStudentsEnrolled: -1 }); // Descending order
 
-        const popularCourses = subcourses.map(subcourse => ({
-            subcourseName: subcourse.subcourseName,
-            thumbnailImageUrl: subcourse.thumbnailImageUrl,
-            totalLessons: subcourse.totalLessons,
-            avgRating: subcourse.avgRating,
-            totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
-            price: subcourse.price
-        }));
+    const popularCourses = subcourses.map(subcourse => ({
+      subcourseName: subcourse.subcourseName,
+      thumbnailImageUrl: subcourse.thumbnailImageUrl,
+      totalLessons: subcourse.totalLessons,
+      avgRating: subcourse.avgRating,
+      totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+      price: subcourse.price
+    }));
 
-        return apiResponse(res, {
-            success: true,
-            message: 'Popular courses retrieved successfully',
-            data: popularCourses,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching popular courses:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch popular courses: ${error.message}`,
-            statusCode: 500,
-        });
-    }
+    return apiResponse(res, {
+      success: true,
+      message: 'Popular courses retrieved successfully',
+      data: popularCourses,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching popular courses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch popular courses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 //get newest courses
 
 exports.getNewestCourses = async (req, res) => {
-    try {
-        const subcourses = await Subcourse.find()
-            .sort({ createdAt: -1 }); // Descending order (newest first)
+  try {
+    const subcourses = await Subcourse.find()
+      .sort({ createdAt: -1 }); // Descending order (newest first)
 
-        const newestCourses = subcourses.map(subcourse => ({
-            subcourseName: subcourse.subcourseName,
-            thumbnailImageUrl: subcourse.thumbnailImageUrl,
-            totalLessons: subcourse.totalLessons,
-            avgRating: subcourse.avgRating,
-            price: subcourse.price
-        }));
+    const newestCourses = subcourses.map(subcourse => ({
+      subcourseName: subcourse.subcourseName,
+      thumbnailImageUrl: subcourse.thumbnailImageUrl,
+      totalLessons: subcourse.totalLessons,
+      avgRating: subcourse.avgRating,
+      price: subcourse.price
+    }));
 
-        return apiResponse(res, {
-            success: true,
-            message: 'Newest courses retrieved successfully',
-            data: newestCourses,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching newest courses:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch newest courses: ${error.message}`,
-            statusCode: 500,
-        });
-    }
+    return apiResponse(res, {
+      success: true,
+      message: 'Newest courses retrieved successfully',
+      data: newestCourses,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching newest courses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch newest courses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 
 
 exports.getSubcourseById = async (req, res) => {
-    try {
-        const subcourseId = req.params.id;
+  try {
+    const subcourseId = req.params.id;
 
-        // Validate subcourseId
-        if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid subcourse ID',
-                statusCode: 400,
-            });
-        }
-
-        // Fetch the top 5 subcourses by totalStudentsEnrolled to determine best sellers
-        const topSubcourses = await Subcourse.aggregate([
-            { $sort: { totalStudentsEnrolled: -1 } },
-            { $limit: 5 },
-            { $project: { totalStudentsEnrolled: 1 } }
-        ]);
-
-        // Extract the minimum totalStudentsEnrolled among the top 5
-        const bestSellerThreshold = topSubcourses.length > 0 ? topSubcourses[topSubcourses.length - 1].totalStudentsEnrolled : 0;
-
-        // Aggregation pipeline for the requested subcourse
-        const subcourse = await Subcourse.aggregate([
-            {
-                $match: { _id: new mongoose.Types.ObjectId(subcourseId) }
-            },
-            {
-                $lookup: {
-                    from: 'lessons', // Collection name for Lesson model
-                    localField: '_id',
-                    foreignField: 'subcourseId',
-                    as: 'lessons'
-                }
-            },
-            {
-                $unwind: {
-                    path: '$lessons',
-                    preserveNullAndEmptyArrays: true // Keep subcourse even if no lessons
-                }
-            },
-            {
-                $group: {
-                    _id: '$_id',
-                    introVideoUrl: { $first: '$introVideoUrl' },
-                    subcourseName: { $first: '$subcourseName' },
-                    avgRating: { $first: '$avgRating' },
-                    totalStudentsEnrolled: { $first: '$totalStudentsEnrolled' },
-                    totalDuration: { $first: '$totalDuration' },
-                    subCourseDescription: { $first: '$subCourseDescription' },
-                    totalLessons: { $first: '$totalLessons' },
-                    lessons: { $push: '$lessons' }
-                }
-            },
-            {
-                $project: {
-                    introVideoUrl: 1,
-                    subcourseName: 1,
-                    avgRating: 1,
-                    totalStudentsEnrolled: 1,
-                    totalDuration: 1,
-                    subCourseDescription: 1,
-                    totalLessons: 1,
-                    lessons: {
-                        $cond: {
-                            if: { $eq: [{ $size: '$lessons' }, 0] },
-                            then: [],
-                            else: {
-                                $map: {
-                                    input: '$lessons',
-                                    as: 'lesson',
-                                    in: {
-                                        lessonName: '$$lesson.lessonName',
-                                        thumbnailImageUrl: '$$lesson.thumbnailImageUrl',
-                                        duration: '$$lesson.duration',
-                                        startTime: '$$lesson.startTime',
-                                        endTime: '$$lesson.endTime',
-                                        date: '$$lesson.date'
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    isBestSeller: {
-                        $cond: {
-                            if: { $gte: ['$totalStudentsEnrolled', bestSellerThreshold] },
-                            then: true,
-                            else: false
-                        }
-                    }
-                }
-            }
-        ]).then(results => results[0]); // Get the first (and only) result
-
-        if (!subcourse) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Subcourse not found',
-                statusCode: 404,
-            });
-        }
-
-        return apiResponse(res, {
-            success: true,
-            message: 'Subcourse details retrieved successfully',
-            data: subcourse,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching subcourse by ID:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch subcourse: ${error.message}`,
-            statusCode: 500,
-        });
+    // Validate subcourseId
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid subcourse ID',
+        statusCode: 400,
+      });
     }
+
+    // Fetch the top 5 subcourses by totalStudentsEnrolled to determine best sellers
+    const topSubcourses = await Subcourse.aggregate([
+      { $sort: { totalStudentsEnrolled: -1 } },
+      { $limit: 5 },
+      { $project: { totalStudentsEnrolled: 1 } }
+    ]);
+
+    // Extract the minimum totalStudentsEnrolled among the top 5
+    const bestSellerThreshold = topSubcourses.length > 0 ? topSubcourses[topSubcourses.length - 1].totalStudentsEnrolled : 0;
+
+    // Aggregation pipeline for the requested subcourse
+    const subcourse = await Subcourse.aggregate([
+      {
+        $match: { _id: new mongoose.Types.ObjectId(subcourseId) }
+      },
+      {
+        $lookup: {
+          from: 'lessons', // Collection name for Lesson model
+          localField: '_id',
+          foreignField: 'subcourseId',
+          as: 'lessons'
+        }
+      },
+      {
+        $unwind: {
+          path: '$lessons',
+          preserveNullAndEmptyArrays: true // Keep subcourse even if no lessons
+        }
+      },
+      {
+        $group: {
+          _id: '$_id',
+          introVideoUrl: { $first: '$introVideoUrl' },
+          subcourseName: { $first: '$subcourseName' },
+          avgRating: { $first: '$avgRating' },
+          totalStudentsEnrolled: { $first: '$totalStudentsEnrolled' },
+          totalDuration: { $first: '$totalDuration' },
+          subCourseDescription: { $first: '$subCourseDescription' },
+          totalLessons: { $first: '$totalLessons' },
+          lessons: { $push: '$lessons' }
+        }
+      },
+      {
+        $project: {
+          introVideoUrl: 1,
+          subcourseName: 1,
+          avgRating: 1,
+          totalStudentsEnrolled: 1,
+          totalDuration: 1,
+          subCourseDescription: 1,
+          totalLessons: 1,
+          lessons: {
+            $cond: {
+              if: { $eq: [{ $size: '$lessons' }, 0] },
+              then: [],
+              else: {
+                $map: {
+                  input: '$lessons',
+                  as: 'lesson',
+                  in: {
+                    lessonId: '$$lesson._id',
+                    lessonName: '$$lesson.lessonName',
+                    thumbnailImageUrl: '$$lesson.thumbnailImageUrl',
+                    duration: '$$lesson.duration',
+                    startTime: '$$lesson.startTime',
+                    endTime: '$$lesson.endTime',
+                    date: '$$lesson.date'
+                  }
+                }
+              }
+            }
+          },
+          isBestSeller: {
+            $cond: {
+              if: { $gte: ['$totalStudentsEnrolled', bestSellerThreshold] },
+              then: true,
+              else: false
+            }
+          }
+        }
+      }
+    ]).then(results => results[0]); // Get the first (and only) result
+
+    if (!subcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Subcourse details retrieved successfully',
+      data: subcourse,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching subcourse by ID:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch subcourse: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 
@@ -303,48 +304,48 @@ exports.getLessonById = async (req, res) => {
 
 //get-all-courses
 exports.getAllCourses = async (req, res) => {
-    try {
-        // Aggregate courses with total subcourses count
-        const courses = await Course.aggregate([
-            {
-                $lookup: {
-                    from: 'subcourses', // Collection name for Subcourse model
-                    localField: '_id',
-                    foreignField: 'courseId',
-                    as: 'subcourses'
-                }
-            },
-            {
-                $project: {
-                    courseName: 1,
-                    CoverImageUrl: 1,
-                    totalModules: { $size: '$subcourses' },
-                }
-            }
-        ]);
-
-        if (!courses.length) {
-            return apiResponse(res, {
-                success: false,
-                message: 'No courses found',
-                statusCode: 404,
-            });
+  try {
+    // Aggregate courses with total subcourses count
+    const courses = await Course.aggregate([
+      {
+        $lookup: {
+          from: 'subcourses', // Collection name for Subcourse model
+          localField: '_id',
+          foreignField: 'courseId',
+          as: 'subcourses'
         }
+      },
+      {
+        $project: {
+          courseName: 1,
+          CoverImageUrl: 1,
+          totalModules: { $size: '$subcourses' },
+        }
+      }
+    ]);
 
-        return apiResponse(res, {
-            success: true,
-            message: 'Courses retrieved successfully',
-            data: courses,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error fetching all courses:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to fetch courses: ${error.message}`,
-            statusCode: 500,
-        });
+    if (!courses.length) {
+      return apiResponse(res, {
+        success: false,
+        message: 'No courses found',
+        statusCode: 404,
+      });
     }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Courses retrieved successfully',
+      data: courses,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching all courses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch courses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 
