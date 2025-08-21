@@ -8,7 +8,7 @@ const router = express.Router();
 
 const {imageUploadController} = require("../../uploloadImages");
 
-router.post('/create-profile', verifyToken,upload.single('profileImageUrl'),createUserProfile);
+// router.post('/create-profile', verifyToken,upload.single('profileImageUrl'),createUserProfile);
 router.put('/update-profile',verifyToken,upload.single('profileImageUrl'), updateUserProfile);
 router.get('/get-profile', verifyToken,getUserProfile);
 router.get("/getUser-basicInfo",verifyToken,getUserbasicInfo)

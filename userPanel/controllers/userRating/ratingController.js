@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Rating = require("../../models/Rating/rating");
 const Subcourse = require("../../../course/models/subcourse");
 const { apiResponse } = require('../../../utils/apiResponse');
+const UserAuth = require("../../models/Auth/Auth")
 
 // Submit or update rating
 exports.submitRating = async (req, res) => {
@@ -15,6 +16,17 @@ exports.submitRating = async (req, res) => {
         success: false,
         message: 'Invalid input data',
         statusCode: 400
+      });
+    }
+
+    // Check if user exists in UserAuth
+    const user = await UserAuth.findById(userId);
+    if (!user) {
+      console.log("User not found for userId:", userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
       });
     }
 
@@ -71,6 +83,8 @@ exports.submitRating = async (req, res) => {
 exports.getAllRatings = async (req, res) => {
   try {
     const { subcourseId } = req.query;
+    console.log("id", subcourseId)
+    const userId = req.userId;
 
     // Validate subcourseId
     if (!subcourseId) {
@@ -80,6 +94,19 @@ exports.getAllRatings = async (req, res) => {
         statusCode: 400
       });
     }
+
+    
+    // Check if user exists in UserAuth
+    const user = await UserAuth.findById(userId);
+    if (!user) {
+      console.log("User not found for userId:", userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
 
     // Fetch all ratings for the subcourse with user and profile details
     const ratings = await Rating.aggregate([

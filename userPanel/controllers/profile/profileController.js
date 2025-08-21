@@ -4,198 +4,195 @@ const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
 const { apiResponse } = require("../../../utils/apiResponse");
 const mongoose = require('mongoose');
 
-// Create a new user profile (POST)
-exports.createUserProfile = async (req, res) => {
-    try {
-        const { address, email } = req.body;
-        const profileImageFile = req.file;
-        console.log("22", profileImageFile)
+// // Create a new user profile (POST)
+// exports.createUserProfile = async (req, res) => {
+//     try {
+//         const { address, email } = req.body;
+//         const profileImageFile = req.file;
+//         console.log("22", profileImageFile)
 
-        console.log("Request files:", req.files);
-        console.log("Profile image file:", profileImageFile);
+//         console.log("Request files:", req.files);
+//         console.log("Profile image file:", profileImageFile);
 
-        // Validate userId from auth middleware
-        if (!req.userId || !mongoose.Types.ObjectId.isValid(req.userId)) {
-            console.log("Invalid or missing userId:", req.userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid or missing user ID',
-                statusCode: 400,
-            });
-        }
+//         // Validate userId from auth middleware
+//         if (!req.userId || !mongoose.Types.ObjectId.isValid(req.userId)) {
+//             console.log("Invalid or missing userId:", req.userId);
+//             return apiResponse(res, {
+//                 success: false,
+//                 message: 'Invalid or missing user ID',
+//                 statusCode: 400,
+//             });
+//         }
 
-        // Check if user exists in UserAuth
-        const user = await UserAuth.findById(req.userId);
-        if (!user) {
-            console.log("User not found for userId:", req.userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'User not found',
-                statusCode: 404,
-            });
-        }
+//         // Check if user exists in UserAuth
+//         const user = await UserAuth.findById(req.userId);
+//         if (!user) {
+//             console.log("User not found for userId:", req.userId);
+//             return apiResponse(res, {
+//                 success: false,
+//                 message: 'User not found',
+//                 statusCode: 404,
+//             });
+//         }
 
-        // Check if profile already exists
-        const existingProfile = await UserProfile.findOne({ userId: req.userId });
-        if (existingProfile) {
-            console.log("Profile already exists for userId:", req.userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'User profile already exists',
-                statusCode: 409,
-            });
-        }
+//         // Check if profile already exists
+//         const existingProfile = await UserProfile.findOne({ userId: req.userId });
+//         if (existingProfile) {
+//             console.log("Profile already exists for userId:", req.userId);
+//             return apiResponse(res, {
+//                 success: false,
+//                 message: 'User profile already exists',
+//                 statusCode: 409,
+//             });
+//         }
 
-        // Validate email if provided
-        if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
-            console.log("Invalid email format:", email);
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid email format',
-                statusCode: 400,
-            });
-        }
+//         // Validate email if provided
+//         if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+//             console.log("Invalid email format:", email);
+//             return apiResponse(res, {
+//                 success: false,
+//                 message: 'Invalid email format',
+//                 statusCode: 400,
+//             });
+//         }
 
-        let profileImageUrl = null;
-        if (profileImageFile) {
-            if (!profileImageFile.buffer || !profileImageFile.mimetype || !profileImageFile.originalname) {
-                console.log("Invalid profile image file:", profileImageFile);
-                return apiResponse(res, {
-                    success: false,
-                    message: 'Invalid profile image file',
-                    statusCode: 400,
-                });
-            }
-            const profileImageFileName = `user/profile/user_${req.userId}/${Date.now()}_${profileImageFile.originalname}`;
-            console.log("Uploading profile image to S3:", profileImageFileName);
-            profileImageUrl = await uploadImage(profileImageFile, profileImageFileName);
-            console.log("Profile image uploaded, URL:", profileImageUrl);
-        } else {
-            console.log("No profile image file provided");
-        }
+//         let profileImageUrl = null;
+//         if (profileImageFile) {
+//             if (!profileImageFile.buffer || !profileImageFile.mimetype || !profileImageFile.originalname) {
+//                 console.log("Invalid profile image file:", profileImageFile);
+//                 return apiResponse(res, {
+//                     success: false,
+//                     message: 'Invalid profile image file',
+//                     statusCode: 400,
+//                 });
+//             }
+//             const profileImageFileName = `user/profile/user_${req.userId}/${Date.now()}_${profileImageFile.originalname}`;
+//             console.log("Uploading profile image to S3:", profileImageFileName);
+//             profileImageUrl = await uploadImage(profileImageFile, profileImageFileName);
+//             console.log("Profile image uploaded, URL:", profileImageUrl);
+//         } else {
+//             console.log("No profile image file provided");
+//         }
 
-        const userProfile = new UserProfile({
-            userId: req.userId,
-            profileImageUrl,
-            address: address || null,
-            email: email || null
-        });
+//         const userProfile = new UserProfile({
+//             userId: req.userId,
+//             profileImageUrl,
+//             address: address || null,
+//             email: email || null
+//         });
 
-        await userProfile.save();
-        console.log("User profile saved:", userProfile);
+//         await userProfile.save();
+//         console.log("User profile saved:", userProfile);
 
-        return apiResponse(res, {
-            success: true,
-            message: 'User profile created successfully',
-            data: userProfile,
-            statusCode: 201,
-        });
-    } catch (error) {
-        console.error('Error creating user profile:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to create user profile: ${error.message}`,
-            statusCode: 500,
-        });
-    }
-};
+//         return apiResponse(res, {
+//             success: true,
+//             message: 'User profile created successfully',
+//             data: userProfile,
+//             statusCode: 201,
+//         });
+//     } catch (error) {
+//         console.error('Error creating user profile:', error);
+//         return apiResponse(res, {
+//             success: false,
+//             message: `Failed to create user profile: ${error.message}`,
+//             statusCode: 500,
+//         });
+//     }
+// };
 
 // Update a user profile (PUT)
 exports.updateUserProfile = async (req, res) => {
-    try {
-        const userId  = req.userId;
-        const { address, email } = req.body;
-        const profileImageFile = req.file;
+  try {
+    const userId = req.userId;
+    const { address, email } = req.body;
+    const profileImageFile = req.file;
 
-        console.log("Update request files:", req.file);
-        console.log("Update profile image file:", profileImageFile);
+    console.log("Update request files:", req.file);
+    console.log("Update profile image file:", profileImageFile);
 
-        // Validate profileId
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            console.log("Invalid profileId:", userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid profile ID',
-                statusCode: 400,
-            });
-        }
-
-        // Find profile
-        const userProfile = await UserProfile.findOne({userId });
-        if (!userProfile) {
-            console.log("Profile not found for profileId:", profileId);
-            return apiResponse(res, {
-                success: false,
-                message: 'User profile not found',
-                statusCode: 404,
-            });
-        }
-
-        // Check authorization
-        if (userProfile.userId.toString() !== req.userId) {
-            console.log("Unauthorized update attempt by userId:", req.userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'Unauthorized to update this profile',
-                statusCode: 403,
-            });
-        }
-
-        // Update fields if provided
-        if (address !== undefined) {
-            console.log("Updating address:", address);
-            userProfile.address = address;
-        }
-        if (email !== undefined) {
-            if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
-                console.log("Invalid email format:", email);
-                return apiResponse(res, {
-                    success: false,
-                    message: 'Invalid email format',
-                    statusCode: 400,
-                });
-            }
-            console.log("Updating email:", email);
-            userProfile.email = email;
-        }
-
-        // Update profile image if provided
-        if (profileImageFile) {
-            if (!profileImageFile.buffer || !profileImageFile.mimetype || !profileImageFile.originalname) {
-                console.log("Invalid profile image file:", profileImageFile);
-                return apiResponse(res, {
-                    success: false,
-                    message: 'Invalid profile image file',
-                    statusCode: 400,
-                });
-            }
-            if (userProfile.profileImageUrl) {
-                console.log("Deleting old profile image from S3:", userProfile.profileImageUrl);
-                await deleteImage(userProfile.profileImageUrl);
-            }
-            const profileImageFileName = `user/profile/user_${req.userId}/${Date.now()}_${profileImageFile.originalname}`;
-            console.log("Uploading new profile image to S3:", profileImageFileName);
-            userProfile.profileImageUrl = await uploadImage(profileImageFile, profileImageFileName);
-            console.log("New profile image uploaded, URL:", userProfile.profileImageUrl);
-        }
-
-        await userProfile.save();
-        console.log("User profile updated:", userProfile);
-
-        return apiResponse(res, {
-            success: true,
-            message: 'User profile updated successfully',
-            data: userProfile,
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error updating user profile:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to update user profile: ${error.message}`,
-            statusCode: 500,
-        });
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.log("Invalid userId:", userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid user ID',
+        statusCode: 400,
+      });
     }
+
+    // Check if user exists in UserAuth
+    const user = await UserAuth.findById(userId);
+    if (!user) {
+      console.log("User not found for userId:", userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Find or create profile
+    let userProfile = await UserProfile.findOne({ userId });
+    if (!userProfile) {
+      console.log("Profile not found, creating new profile for userId:", userId);
+      userProfile = new UserProfile({ userId });
+    }
+
+    // Update fields if provided
+    if (address !== undefined) {
+      console.log("Updating address:", address);
+      userProfile.address = address;
+    }
+    if (email !== undefined) {
+      if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+        console.log("Invalid email format:", email);
+        return apiResponse(res, {
+          success: false,
+          message: 'Invalid email format',
+          statusCode: 400,
+        });
+      }
+      console.log("Updating email:", email);
+      userProfile.email = email;
+    }
+
+    // Update profile image if provided
+    if (profileImageFile) {
+      if (!profileImageFile.buffer || !profileImageFile.mimetype || !profileImageFile.originalname) {
+        console.log("Invalid profile image file:", profileImageFile);
+        return apiResponse(res, {
+          success: false,
+          message: 'Invalid profile image file',
+          statusCode: 400,
+        });
+      }
+      if (userProfile.profileImageUrl) {
+        console.log("Deleting old profile image from S3:", userProfile.profileImageUrl);
+        await deleteImage(userProfile.profileImageUrl);
+      }
+      const profileImageFileName = `user/profile/user_${userId}/${Date.now()}_${profileImageFile.originalname}`;
+      console.log("Uploading new profile image to S3:", profileImageFileName);
+      userProfile.profileImageUrl = await uploadImage(profileImageFile, profileImageFileName);
+      console.log("New profile image uploaded, URL:", userProfile.profileImageUrl);
+    }
+
+    await userProfile.save();
+    console.log("User profile saved/updated:", userProfile);
+
+    return apiResponse(res, {
+      success: true,
+      message: userProfile.isNew ? 'User profile created successfully' : 'User profile updated successfully',
+      data: userProfile,
+      statusCode: userProfile.isNew ? 201 : 200,
+    });
+  } catch (error) {
+    console.error('Error updating/creating user profile:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to update/create user profile: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 // Get authenticated user's profile (GET)

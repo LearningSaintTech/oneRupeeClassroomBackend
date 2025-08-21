@@ -551,3 +551,95 @@ exports.getEnrolledUsersBySubcourse = async (req, res) => {
     });
   }
 };
+
+
+
+exports.getSubcoursesByCourseId = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid course ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not found',
+        statusCode: 404,
+      });
+    }
+
+    // Fetch subcourses with thumbnail, price, totalLessons, and isLike
+    const subcourses = await Subcourse.aggregate([
+      {
+        $match: { courseId: new mongoose.Types.ObjectId(courseId) }
+      },
+      {
+        $lookup: {
+          from: 'favourites',
+          let: { subcourseId: '$_id', userId: new mongoose.Types.ObjectId(userId) },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$subcourseId', '$$subcourseId'] },
+                    { $eq: ['$userId', '$$userId'] }
+                  ]
+                }
+              }
+            },
+            { $project: { isLike: 1 } }
+          ],
+          as: 'favourite'
+        }
+      },
+      {
+        $project: {
+          subcourseName: 1,
+          price: 1,
+          thumbnailImageUrl: 1,
+          totalLessons: 1,
+          isLike: {
+            $cond: {
+              if: { $eq: [{ $size: '$favourite' }, 0] },
+              then: false,
+              else: { $arrayElemAt: ['$favourite.isLike', 0] }
+            }
+          }
+        }
+      }
+    ]);
+
+    if (!subcourses.length) {
+      return apiResponse(res, {
+        success: false,
+        message: 'No subcourses found for this course',
+        statusCode: 404,
+      });
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Subcourses retrieved successfully',
+      data: subcourses,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching subcourses:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch subcourses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};

@@ -21,6 +21,7 @@ const adminProfileRoutes = require("./adminPanel/routes/profile");
 const enrolledStudentsRoutes = require("./adminPanel/routes/enrolledStudents");
 const totalusersRoutes = require("./adminPanel/routes/users");
 const promoRoutes = require("./Promo/routes/promoRoutes");
+const getAllRatings = require("./adminPanel/routes/ratings");
 
 
 require('dotenv').config();
@@ -51,15 +52,16 @@ app.use("/api/user/certificate",downloadCertificateRoutes);
 
 
 
-app.use("/api/admin/auth",adminauthRoutes)
-app.use("/api/admin/course",courseRoutes)
-app.use("/api/admin/subcourse",subcourseRoutes)
-app.use("/api/admin/lesson",lessonRoutes)
-app.use("/api/admin/template",templateRoutes)
-app.use("/api/admin/stats",dashboardRoutes)
-app.use("/api/admin/students",enrolledStudentsRoutes)
-app.use("/api/admin/profile",adminProfileRoutes)
-app.use("/api/admin/users",totalusersRoutes)
+app.use("/api/admin/auth",adminauthRoutes);
+app.use("/api/admin/course",courseRoutes);
+app.use("/api/admin/subcourse",subcourseRoutes);
+app.use("/api/admin/lesson",lessonRoutes);
+app.use("/api/admin/template",templateRoutes);
+app.use("/api/admin/stats",dashboardRoutes);
+app.use("/api/admin/students",enrolledStudentsRoutes);
+app.use("/api/admin/profile",adminProfileRoutes);
+app.use("/api/admin/users",totalusersRoutes);
+app.use("/api/admin/ratings",getAllRatings);
 
 
 app.use("/api/promo",promoRoutes)

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Favourite = require('../../models/Favourite/favouriteCourse');
 const Subcourse = require('../../../course/models/subcourse');
 const { apiResponse } = require('../../../utils/apiResponse');
+const UserAuth = require("../../models/Auth/Auth");
 
 // Toggle favorite status for a subcourse
 exports.toggleFavourite = async (req, res) => {
@@ -17,6 +18,18 @@ exports.toggleFavourite = async (req, res) => {
                 statusCode: 400,
             });
         }
+
+            // Check if user exists in UserAuth
+            const user = await UserAuth.findById(userId);
+            if (!user) {
+              console.log("User not found for userId:", userId);
+              return apiResponse(res, {
+                success: false,
+                message: 'User not found',
+                statusCode: 404,
+              });
+            }
+        
 
         // Check if subcourse exists
         const subcourse = await Subcourse.findById(subcourseId);
