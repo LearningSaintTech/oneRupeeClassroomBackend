@@ -1,21 +1,21 @@
+const mongoose = require('mongoose');
 const Course = require('../../../course/models/course'); 
 const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
 const Lesson = require("../../../course/models/lesson");
 const Subcourse = require("../../../course/models/subcourse");
-const { apiResponse} = require("../../../utils/apiResponse");
-const mongoose = require('mongoose');
+const { apiResponse } = require("../../../utils/apiResponse");
 
 // Create a new course 
 exports.createCourse = async (req, res) => {
   try {
-    const adminId = req.userId
-    const { courseName } = req.body;
+    const adminId = req.userId;
+    const { courseName, certificateDescription } = req.body;
     const file = req.file;
 
-    if (!courseName || !file) {
+    if (!courseName || !certificateDescription || !file) {
       return apiResponse(res, {
         success: false,
-        message: 'Course name and cover image are required',
+        message: 'Course name, certificate description, and cover image are required',
         statusCode: 400,
       });
     }
@@ -31,6 +31,7 @@ exports.createCourse = async (req, res) => {
       adminId,
       courseName,
       CoverImageUrl: coverImageUrl,
+      certificateDescription,
     });
 
     await course.save();
@@ -61,7 +62,8 @@ exports.getAllCourses = async (req, res) => {
       SNo: index + 1,
       _id: course._id,
       courseName: course.courseName,
-      CoverImageUrl: course.CoverImageUrl
+      CoverImageUrl: course.CoverImageUrl,
+      certificateDescription: course.certificateDescription,
     }));
 
     return apiResponse(res, {
@@ -80,13 +82,11 @@ exports.getAllCourses = async (req, res) => {
   }
 };
 
-
-
 // Update a course
 exports.updateCourse = async (req, res) => {
   try {
     const courseId = req.params.id;
-    const { courseName } = req.body;
+    const { courseName, certificateDescription } = req.body;
     const file = req.file;
 
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -110,6 +110,11 @@ exports.updateCourse = async (req, res) => {
     // Update course name if provided
     if (courseName) {
       course.courseName = courseName;
+    }
+
+    // Update certificate description if provided
+    if (certificateDescription) {
+      course.certificateDescription = certificateDescription;
     }
 
     // Update cover image if new file is provided
@@ -141,83 +146,83 @@ exports.updateCourse = async (req, res) => {
   }
 };
 
-//delete a course
+// Delete a course
 exports.deleteCourse = async (req, res) => {
-    try {
-        const courseId = req.params.id;
+  try {
+    const courseId = req.params.id;
 
-        // Validate courseId
-        if (!mongoose.Types.ObjectId.isValid(courseId)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid course ID',
-                statusCode: 400,
-            });
-        }
-
-        // Find course
-        const course = await Course.findById(courseId);
-        if (!course) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Course not found',
-                statusCode: 404,
-            });
-        }
-
-        // Check admin authorization
-        if (course.adminId.toString() !== req.userId) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Unauthorized to delete this course',
-                statusCode: 403,
-            });
-        }
-
-        // Find all subcourses for this course
-        const subcourses = await Subcourse.find({ courseId });
-
-        // Delete associated lessons and their S3 introVideoUrl files
-        for (const subcourse of subcourses) {
-            const lessons = await Lesson.find({ subcourseId: subcourse._id });
-            for (const lesson of lessons) {
-                if (lesson.introVideoUrl) {
-                    await deleteImage(lesson.introVideoUrl);
-                }
-            }
-            await Lesson.deleteMany({ subcourseId: subcourse._id });
-
-            // Delete subcourse's S3 files
-            if (subcourse.certificateUrl) {
-                await deleteImage(subcourse.certificateUrl);
-            }
-            if (subcourse.introVideoUrl) {
-                await deleteImage(subcourse.introVideoUrl);
-            }
-        }
-
-        // Delete all subcourses for this course
-        await Subcourse.deleteMany({ courseId });
-
-        // Delete the course
-        await Course.deleteOne({ _id: courseId });
-
-        return apiResponse(res, {
-            success: true,
-            message: 'Course and associated subcourses and lessons deleted successfully',
-            statusCode: 200,
-        });
-    } catch (error) {
-        console.error('Error deleting course:', error);
-        return apiResponse(res, {
-            success: false,
-            message: `Failed to delete course: ${error.message}`,
-            statusCode: 500,
-        });
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid course ID',
+        statusCode: 400,
+      });
     }
+
+    // Find course
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check admin authorization
+    if (course.adminId.toString() !== req.userId) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Unauthorized to delete this course',
+        statusCode: 403,
+      });
+    }
+
+    // Find all subcourses for this course
+    const subcourses = await Subcourse.find({ courseId });
+
+    // Delete associated lessons and their S3 introVideoUrl files
+    for (const subcourse of subcourses) {
+      const lessons = await Lesson.find({ subcourseId: subcourse._id });
+      for (const lesson of lessons) {
+        if (lesson.introVideoUrl) {
+          await deleteImage(lesson.introVideoUrl);
+        }
+      }
+      await Lesson.deleteMany({ subcourseId: subcourse._id });
+
+      // Delete subcourse's S3 files
+      if (subcourse.certificateUrl) {
+        await deleteImage(subcourse.certificateUrl);
+      }
+      if (subcourse.introVideoUrl) {
+        await deleteImage(subcourse.introVideoUrl);
+      }
+    }
+
+    // Delete all subcourses for this course
+    await Subcourse.deleteMany({ courseId });
+
+    // Delete the course
+    await Course.deleteOne({ _id: courseId });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Course and associated subcourses and lessons deleted successfully',
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error deleting course:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to delete course: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
-
+// Search courses
 exports.searchCourses = async (req, res) => {
   try {
     const { q } = req.query;
@@ -245,7 +250,8 @@ exports.searchCourses = async (req, res) => {
       SNo: index + 1,
       _id: course._id,
       courseName: course.courseName,
-      CoverImageUrl: course.CoverImageUrl
+      CoverImageUrl: course.CoverImageUrl,
+      certificateDescription: course.certificateDescription,
     }));
 
     return apiResponse(res, {

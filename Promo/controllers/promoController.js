@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Promo = require('../models/promo');
-const { uploadImage } = require('../../utils/s3Functions');
+const { uploadImage,deleteImage } = require('../../utils/s3Functions');
 const { apiResponse } = require('../../utils/apiResponse');
 
 exports.uploadPromo = async (req, res) => {
@@ -65,6 +65,52 @@ exports.getAllPromos = async (req, res) => {
       success: false,
       message: 'Error fetching promos',
       data: null,
+      statusCode: 500,
+    });
+  }
+};
+
+
+
+exports.deletePromo = async (req, res) => {
+  try {
+    const { promoId } = req.params;
+
+    // Validate promoId
+    if (!mongoose.Types.ObjectId.isValid(promoId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid promo ID',
+        statusCode: 400,
+      });
+    }
+
+    // Find the promo
+    const promo = await Promo.findById(promoId);
+    if (!promo) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Promo not found',
+        statusCode: 404,
+      });
+    }
+
+    // Delete the image from S3
+    await deleteImage(promo.promo);
+
+    // Delete the promo from the database
+    await Promo.deleteOne({ _id: promoId });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Promo deleted successfully',
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error deleting promo:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Error deleting promo: ${error.message}`,
       statusCode: 500,
     });
   }

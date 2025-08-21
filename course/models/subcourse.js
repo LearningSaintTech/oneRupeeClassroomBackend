@@ -23,10 +23,6 @@ const subcourseSchema = new mongoose.Schema({
         type: Number,
         default: 1
     },
-    certificateUrl: {
-        type: String,
-        required: true
-    },
     certificatePrice: {
         type: Number,
         required: true

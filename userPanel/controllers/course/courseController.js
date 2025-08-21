@@ -6,6 +6,7 @@ const Course = require("../../../course/models/course");
 const UserCourse = require("../../models/UserCourse/userCourse");
 const User = require("../../models/Auth/Auth");
 const UserProfile = require("../../models/Profile/userProfile");
+const userLesson = require("../../models/UserCourse/userLesson")
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -113,20 +114,26 @@ exports.getSubcourseById = async (req, res) => {
 
     // Check payment status if userId is provided
     let paymentStatus = false;
+    let subcourseCompleted = false;
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       console.log(`Valid userId: ${userId}, checking user...`);
       const user = await User.findById(userId);
       if (user) {
         console.log(`User found: ${userId}, checking purchasedsubCourses...`);
-        // Set paymentStatus to true if subcourseId exists in purchasedsubCourses
+        // Check payment status
         paymentStatus = user.purchasedsubCourses.some(
-          purchase => {
-            const isMatch = purchase.toString() === subcourseId.toString();
-            console.log(`Checking purchase: ${purchase.toString()}, Match: ${isMatch}`);
-            return isMatch;
-          }
+          purchase => purchase.toString() === subcourseId.toString()
         );
         console.log(`Payment status for subcourse ${subcourseId}: ${paymentStatus}`);
+
+        // Check subcourse completion status
+        const userCourse = await UserCourse.findOne({ userId, subcourseId });
+        if (userCourse) {
+          subcourseCompleted = userCourse.isCompleted;
+          console.log(`Subcourse ${subcourseId} completion status: ${subcourseCompleted}`);
+        } else {
+          console.log(`No UserCourse found for userId: ${userId}, subcourseId: ${subcourseId}`);
+        }
       } else {
         console.log(`User not found for ID: ${userId}`);
       }
@@ -168,6 +175,26 @@ exports.getSubcourseById = async (req, res) => {
         }
       },
       {
+        $lookup: {
+          from: 'userlessons', // Collection name for UserLesson model
+          let: { lessonId: '$lessons._id', userId: new mongoose.Types.ObjectId(userId) },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$lessonId', '$$lessonId'] },
+                    { $eq: ['$userId', '$$userId'] }
+                  ]
+                }
+              }
+            },
+            { $project: { isCompleted: 1 } }
+          ],
+          as: 'lessonCompletion'
+        }
+      },
+      {
         $group: {
           _id: '$_id',
           introVideoUrl: { $first: '$introVideoUrl' },
@@ -177,7 +204,24 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: { $first: '$totalDuration' },
           subCourseDescription: { $first: '$subCourseDescription' },
           totalLessons: { $first: '$totalLessons' },
-          lessons: { $push: '$lessons' }
+          lessons: {
+            $push: {
+              lessonId: '$lessons._id',
+              lessonName: '$lessons.lessonName',
+              thumbnailImageUrl: '$lessons.thumbnailImageUrl',
+              duration: '$lessons.duration',
+              startTime: '$lessons.startTime',
+              endTime: '$lessons.endTime',
+              date: '$lessons.date',
+              isCompleted: {
+                $cond: {
+                  if: { $eq: [{ $size: '$lessonCompletion' }, 0] },
+                  then: false,
+                  else: { $arrayElemAt: ['$lessonCompletion.isCompleted', 0] }
+                }
+              }
+            }
+          }
         }
       },
       {
@@ -189,27 +233,7 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: 1,
           subCourseDescription: 1,
           totalLessons: 1,
-          lessons: {
-            $cond: {
-              if: { $eq: [{ $size: '$lessons' }, 0] },
-              then: [],
-              else: {
-                $map: {
-                  input: '$lessons',
-                  as: 'lesson',
-                  in: {
-                    lessonId: '$$lesson._id',
-                    lessonName: '$$lesson.lessonName',
-                    thumbnailImageUrl: '$$lesson.thumbnailImageUrl',
-                    duration: '$$lesson.duration',
-                    startTime: '$$lesson.startTime',
-                    endTime: '$$lesson.endTime',
-                    date: '$$lesson.date'
-                  }
-                }
-              }
-            }
-          },
+          lessons: 1,
           isBestSeller: {
             $cond: {
               if: { $gte: ['$totalStudentsEnrolled', bestSellerThreshold] },
@@ -217,7 +241,8 @@ exports.getSubcourseById = async (req, res) => {
               else: false
             }
           },
-          paymentStatus: { $literal: paymentStatus } // Add paymentStatus to the response
+          paymentStatus: { $literal: paymentStatus },
+          isCompleted: { $literal: subcourseCompleted } // Add subcourse completion status
         }
       }
     ]).then(results => {

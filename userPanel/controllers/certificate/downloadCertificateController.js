@@ -1,122 +1,141 @@
-const { createCanvas , Image } = require('canvas');
-const { v4: uuidv4 } = require('uuid');
+const puppeteer = require('puppeteer');
 const mongoose = require('mongoose');
-const User = require('../../models/Auth/Auth'); 
-const Subcourse = require('../../../course/models/subcourse'); 
-const UserCourse = require('../../models/UserCourse/userCourse'); 
-const { apiResponse } = require('../../../utils/apiResponse'); 
-const fs = require('fs');
-const path = require('path');
+const User = require('../../models/Auth/Auth');
+const Subcourse = require('../../../course/models/subcourse');
+const Template = require('../../../adminPanel/models/Templates/certificateTemplate');
+const UserCourse = require("../../models/UserCourse/userCourse")
+const CertificateTemplate = require("../../../adminPanel/models/Templates/certificateTemplate")
+const { apiResponse } = require('../../../utils/apiResponse');
+const { v4: uuidv4 } = require('uuid');
+const moment = require('moment-timezone');
+const pdf = require('html-pdf');
+const crypto = require('crypto');
 
-// Generate and download certificate with dynamic text
+
+
+// Controller for downloading certificate
 exports.downloadCertificate = async (req, res) => {
   try {
-    const userId = req.userId;
     const { subcourseId } = req.body;
+    console.log(`[DEBUG] Request received - userId: ${req.userId}, subcourseId: ${subcourseId}`); // Debug log
 
-    // Validate inputs
-    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(subcourseId)) {
+    // Validate input
+    console.log('[DEBUG] Validating subcourseId'); // Debug log
+    if (!subcourseId) {
+      console.log('[DEBUG] Subcourse ID missing in request body'); // Debug log
       return apiResponse(res, {
         success: false,
-        message: 'Invalid userId or subcourseId',
-        statusCode: 400,
+        message: 'Subcourse ID is required',
+        statusCode: 400
       });
     }
 
-    // Check if user exists
-    const user = await User.findById(userId).select('fullName');
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log(`[DEBUG] Invalid subcourseId format: ${subcourseId}`); // Debug log
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid subcourse ID',
+        statusCode: 400
+      });
+    }
+
+    // Check if user has completed the course
+    console.log(`[DEBUG] Checking UserCourse for userId: ${req.userId}, subcourseId: ${subcourseId}`); // Debug log
+    const userCourse = await UserCourse.findOne({ userId: req.userId, subcourseId, isCompleted: true });
+    if (!userCourse) {
+      console.log(`[DEBUG] UserCourse not found or course not completed - userId: ${req.userId}, subcourseId: ${subcourseId}`); // Debug log
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not completed or not enrolled',
+        statusCode: 403
+      });
+    }
+    console.log('[DEBUG] UserCourse found:', userCourse); // Debug log
+
+    // Fetch template
+    console.log('[DEBUG] Fetching certificate template'); // Debug log
+    const template = await CertificateTemplate.findOne().sort({ createdAt: -1 }); // Get latest template
+    if (!template) {
+      console.log('[DEBUG] No certificate template found in database'); // Debug log
+      return apiResponse(res, {
+        success: false,
+        message: 'Certificate template not found',
+        statusCode: 404
+      });
+    }
+    console.log('[DEBUG] Template fetched - ID:', template._id); // Debug log
+
+    // Fetch user
+    console.log(`[DEBUG] Fetching user with ID: ${req.userId}`); // Debug log
+    const user = await User.findById(req.userId);
     if (!user) {
+      console.log(`[DEBUG] User not found for ID: ${req.userId}`); // Debug log
       return apiResponse(res, {
         success: false,
         message: 'User not found',
-        statusCode: 404,
+        statusCode: 404
       });
     }
+    console.log('[DEBUG] User fetched:', user.fullName); // Debug log
 
-    // Check if subcourse exists
-    const subcourse = await Subcourse.findById(subcourseId).select('subcourseName');
+    // Fetch subcourse
+    console.log(`[DEBUG] Fetching subcourse with ID: ${subcourseId}`); // Debug log
+    const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
+      console.log(`[DEBUG] Subcourse not found for ID: ${subcourseId}`); // Debug log
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
-        statusCode: 404,
+        statusCode: 404
       });
     }
+    console.log('[DEBUG] Subcourse fetched:', subcourse.subcourseName); // Debug log
 
-    // Verify subcourse completion
-    const userCourse = await UserCourse.findOne({ userId, subcourseId }).select('isCompleted');
-    if (!userCourse || !userCourse.isCompleted) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Subcourse not completed',
-        statusCode: 403,
-      });
-    }
+    // Generate dynamic fields
+    const certificateId = `LS-${uuidv4().split('-')[0].toUpperCase()}`; // Random 8-char UUID
+    const currentDate = moment().tz('Asia/Kolkata').format('DD/MM/YYYY HH:mm:ss'); // e.g., 21/08/2025 11:45:00
+    const certificateDescription = subcourse.certificateDescription || 'This certifies that the above-named individual has completed all required modules, assessments, and project work associated with the course, demonstrating the knowledge and skills necessary in the respective field.';
+    console.log('[DEBUG] Dynamic fields generated:', { certificateId, currentDate, certificateDescription }); // Debug log
 
-    // Generate unique certificate ID
-    const certificateId = uuidv4();
+    // Replace placeholders in the template
+    console.log('[DEBUG] Replacing placeholders in HTML template'); // Debug log
+    let modifiedHtmlContent = template.content;
+    console.log('[DEBUG] Original HTML content length:', modifiedHtmlContent.length); // Debug log
+    modifiedHtmlContent = modifiedHtmlContent
+      .replace(/{{username}}/g, user.fullName.toUpperCase())
+      .replace(/{{subcourseName}}/g, subcourse.subcourseName)
+      .replace(/{{certificateDescription}}/g, certificateDescription)
+      .replace(/{{certificateId}}/g, certificateId)
+      .replace(/{{currentDate}}/g, currentDate);
+    console.log('[DEBUG] Modified HTML content length:', modifiedHtmlContent.length); // Debug log
 
-    // Set completion date (02:09 PM IST, August 16, 2025)
-    const completionDate = new Date('2025-08-16T14:09:00+05:30').toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).replace(/\//g, '/'); // Format as DD/MM/YYYY
+    // Generate PDF with Puppeteer
+    console.log('[DEBUG] Generating PDF with Puppeteer'); // Debug log
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 595, height: 842 }); // A4 in pixels (approx. 210mm x 297mm)
+    await page.setContent(modifiedHtmlContent, { waitUntil: 'networkidle0' }); // Wait for all network requests (images, etc.)
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
+    });
+    await browser.close();
 
-    // Load the template image
-    const templatePath = path.resolve('public/certificate-template.jpeg');
-    console.log("44",templatePath)
-    if (!fs.existsSync(templatePath)) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Certificate template image not found',
-        statusCode: 500,
-      });
-    }
-
-    // Create canvas with the same dimensions as the template
-    const img = new Image();
-    img.src = fs.readFileSync(templatePath);
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-
-    // Draw the template image
-    ctx.drawImage(img, 0, 0);
-
-    // Set text properties
-    ctx.fillStyle = 'black';
-    ctx.font = '30px Arial';
-    ctx.textAlign = 'center';
-
-    // Define text positions (adjust these coordinates based on your template)
-    const textPositions = {
-      name: { x: canvas.width / 2, y: canvas.height / 2 - 100 },
-      courseDesc: { x: canvas.width / 2, y: canvas.height / 2 - 50 },
-      certificateId: { x: canvas.width / 2, y: canvas.height / 2 + 50 },
-      completionDate: { x: canvas.width / 2, y: canvas.height / 2 + 100 },
-    };
-
-    // Add dynamic text to the canvas
-    ctx.fillText(user.fullName, textPositions.name.x, textPositions.name.y);
-    ctx.fillText(`Course: ${subcourse.subcourseName}`, textPositions.courseDesc.x, textPositions.courseDesc.y);
-    ctx.fillText(`Certificate ID: ${certificateId}`, textPositions.certificateId.x, textPositions.certificateId.y);
-    ctx.fillText(`Completed on: ${completionDate}`, textPositions.completionDate.x, textPositions.completionDate.y);
-
-    // Convert canvas to PNG buffer
-    const pngBuffer = canvas.toBuffer('image/png');
-
-    // Set headers for file download
-    res.setHeader('Content-Disposition', `attachment; filename=certificate_${subcourseId}_${userId}.png`);
-    res.setHeader('Content-Type', 'image/png');
-
-    // Send the PNG buffer as response
-    res.send(pngBuffer);
+    console.log('[DEBUG] PDF generated successfully, buffer length:', pdfBuffer.length); // Debug log
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="certificate_${certificateId}.pdf"`);
+    res.send(pdfBuffer);
 
   } catch (error) {
+    console.error('[DEBUG] Error in downloadCertificate:', error); // Debug log
     return apiResponse(res, {
       success: false,
-      message: `Failed to download certificate: ${error.message}`,
-      statusCode: 500,
+      message: `Error generating certificate: ${error.message}`,
+      statusCode: 500
     });
   }
 };

@@ -1,5 +1,5 @@
 const express = require('express');
-const {downloadCertificate} = require('../controllers/downloadCertificates/downloadCertificateController');
+const {downloadCertificate} = require('../controllers/certificate/downloadCertificateController');
 const {verifyToken} = require("../../middlewares/authMiddleware");
 
 

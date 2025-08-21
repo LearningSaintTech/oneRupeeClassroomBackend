@@ -9,7 +9,6 @@ const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const fs = require('fs').promises;
 const path = require('path');
 
-
 // Set FFmpeg path programmatically
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -69,13 +68,12 @@ exports.createSubcourse = async (req, res) => {
             totalLessons,
             totalDuration
         } = req.body;
-        const certificateFile = req.files?.certificateUrl?.[0];
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
-        console.log("Uploaded files:", { certificateFile, introVideoFile });
+        console.log("Uploaded files:", { introVideoFile });
 
         // Validate required fields
-        if (!courseId || !subcourseName || !subCourseDescription || !certificateFile || !certificatePrice || !certificateDescription || !introVideoFile || !totalLessons) {
+        if (!courseId || !subcourseName || !subCourseDescription || !certificatePrice || !certificateDescription || !introVideoFile || !totalLessons) {
             return apiResponse(res, {
                 success: false,
                 message: 'All required fields must be provided',
@@ -112,11 +110,8 @@ exports.createSubcourse = async (req, res) => {
             });
         }
 
-        // Upload certificate and intro video to S3
-        const certificateFileName = `subcourses/certificates/${Date.now()}_${certificateFile.originalname}`;
+        // Upload intro video to S3
         const introVideoFileName = `subcourses/videos/${Date.now()}_${introVideoFile.originalname}`;
-
-        const certificateUrl = await uploadImage(certificateFile, certificateFileName);
         const introVideoUrl = await uploadImage(introVideoFile, introVideoFileName);
 
         // Generate thumbnail from intro video
@@ -129,7 +124,6 @@ exports.createSubcourse = async (req, res) => {
             subcourseName,
             subCourseDescription,
             price: price || 1,
-            certificateUrl,
             certificatePrice,
             certificateDescription,
             introVideoUrl,
@@ -171,12 +165,12 @@ exports.getAllSubcourses = async (req, res) => {
             subcourseName: subcourse.subcourseName,
             subCourseDescription: subcourse.subCourseDescription,
             price: subcourse.price,
-            certificateUrl: subcourse.certificateUrl,
             certificatePrice: subcourse.certificatePrice,
             certificateDescription: subcourse.certificateDescription,
             introVideoUrl: subcourse.introVideoUrl,
             totalLessons: subcourse.totalLessons,
-            duration:subcourse.totalDuration
+            totalDuration: subcourse.totalDuration,
+            thumbnailImageUrl: subcourse.thumbnailImageUrl,
         }));
 
         return apiResponse(res, {
@@ -208,7 +202,6 @@ exports.updateSubcourse = async (req, res) => {
             certificateDescription,
             totalLessons,
         } = req.body;
-        const certificateFile = req.files?.certificate;
         const introVideoFile = req.files?.introVideo;
 
         // Validate subcourseId
@@ -267,18 +260,15 @@ exports.updateSubcourse = async (req, res) => {
         if (certificateDescription) subcourse.certificateDescription = certificateDescription;
         if (totalLessons) subcourse.totalLessons = totalLessons;
 
-        // Update certificate if new file is provided
-        if (certificateFile) {
-            await deleteImage(subcourse.certificateUrl);
-            const certificateFileName = `subcourses/certificates/${Date.now()}_${certificateFile.originalname}`;
-            subcourse.certificateUrl = await uploadImage(certificateFile, certificateFileName);
-        }
-
         // Update intro video if new file is provided
         if (introVideoFile) {
             await deleteImage(subcourse.introVideoUrl);
             const introVideoFileName = `subcourses/videos/${Date.now()}_${introVideoFile.originalname}`;
             subcourse.introVideoUrl = await uploadImage(introVideoFile, introVideoFileName);
+
+            // Regenerate thumbnail
+            const thumbnailUrl = await generateThumbnail(introVideoFile.buffer, `thumbnail_${subcourseName}`);
+            subcourse.thumbnailImageUrl = thumbnailUrl;
         }
 
         await subcourse.save();
@@ -299,8 +289,7 @@ exports.updateSubcourse = async (req, res) => {
     }
 };
 
-
-//delete a subcourse
+// Delete a subcourse
 exports.deleteSubcourse = async (req, res) => {
     try {
         const subcourseId = req.params.id;
@@ -343,9 +332,6 @@ exports.deleteSubcourse = async (req, res) => {
         await Lesson.deleteMany({ subcourseId });
 
         // Delete subcourse's S3 files
-        if (subcourse.certificateUrl) {
-            await deleteImage(subcourse.certificateUrl);
-        }
         if (subcourse.introVideoUrl) {
             await deleteImage(subcourse.introVideoUrl);
         }
@@ -368,8 +354,7 @@ exports.deleteSubcourse = async (req, res) => {
     }
 };
 
-
-
+// Search subcourses
 exports.searchSubcourses = async (req, res) => {
   try {
     const { q } = req.query;
@@ -402,6 +387,8 @@ exports.searchSubcourses = async (req, res) => {
       courseName: subcourse.courseId?.courseName || 'N/A',
       subCourseDescription: subcourse.subCourseDescription,
       price: subcourse.price,
+      certificatePrice: subcourse.certificatePrice,
+      certificateDescription: subcourse.certificateDescription,
       introVideoUrl: subcourse.introVideoUrl,
       totalLessons: subcourse.totalLessons,
       totalDuration: subcourse.totalDuration,

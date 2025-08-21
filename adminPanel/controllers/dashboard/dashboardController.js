@@ -12,12 +12,16 @@ exports.getStats = async (req, res) => {
     // Count users with verified numbers
     const verifiedUsers = await User.countDocuments({ isNumberVerified: true });
     
+    // Count certified learners (users with isCertificateDownloaded true)
+    const certifiedLearners = await UsermainCourse.countDocuments({ isCertificateDownloaded: true });
+
     return apiResponse(res, {
       success: true,
       message: "Statistics fetched successfully",
       data: {
         totalCourses,
-        verifiedUsers
+        verifiedUsers,
+        certifiedLearners
       },
       statusCode: 200
     });
@@ -30,7 +34,6 @@ exports.getStats = async (req, res) => {
     });
   }
 };
-
 
 exports.getRecentCourses = async (req, res) => {
   try {
