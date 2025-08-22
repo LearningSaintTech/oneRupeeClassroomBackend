@@ -11,8 +11,39 @@ const userLesson = require("../../models/UserCourse/userLesson")
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
   try {
-    // Fetch only required fields from Subcourse collection
-    const subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching subcourses for userId: ${userId}`);
+
+    let subcourses = [];
+
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Valid userId: ${userId}, checking purchasedsubCourses...`);
+      const user = await User.findById(userId).select('purchasedsubCourses');
+      if (user) {
+        console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
+        subcourses = await Subcourse.find(
+          { _id: { $nin: user.purchasedsubCourses || [] } },
+          'subcourseName thumbnailImageUrl totalLessons avgRating price'
+        );
+        console.log(`Found ${subcourses.length} subcourses where courseId is not in purchasedsubCourses`);
+      } else {
+        console.log(`User not found for ID: ${userId}, fetching all subcourses...`);
+        subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+      }
+    } else {
+      console.log(`Invalid or missing userId: ${userId}, fetching all subcourses...`);
+      subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+    }
+
+    if (!subcourses.length) {
+      console.log('No subcourses available after filtering');
+      return apiResponse(res, {
+        success: true,
+        message: 'No subcourses available',
+        data: [],
+        statusCode: 200,
+      });
+    }
 
     return apiResponse(res, {
       success: true,
@@ -29,8 +60,6 @@ exports.getAllSubcourses = async (req, res) => {
     });
   }
 };
-
-
 //get popular courses 
 
 exports.getPopularCourses = async (req, res) => {
@@ -578,7 +607,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       });
     }
 
-    // Fetch subcourses with thumbnail, price, totalLessons, and isLike
+    // Fetch subcourses with thumbnail, price, totalLessons, isLike, and avgRating
     const subcourses = await Subcourse.aggregate([
       {
         $match: { courseId: new mongoose.Types.ObjectId(courseId) }
@@ -604,6 +633,14 @@ exports.getSubcoursesByCourseId = async (req, res) => {
         }
       },
       {
+        $lookup: {
+          from: 'ratings',
+          localField: '_id',
+          foreignField: 'subcourseId',
+          as: 'ratings'
+        }
+      },
+      {
         $project: {
           subcourseName: 1,
           price: 1,
@@ -614,6 +651,13 @@ exports.getSubcoursesByCourseId = async (req, res) => {
               if: { $eq: [{ $size: '$favourite' }, 0] },
               then: false,
               else: { $arrayElemAt: ['$favourite.isLike', 0] }
+            }
+          },
+          avgRating: {
+            $cond: {
+              if: { $eq: [{ $size: '$ratings' }, 0] },
+              then: 0,
+              else: { $avg: '$ratings.rating' }
             }
           }
         }

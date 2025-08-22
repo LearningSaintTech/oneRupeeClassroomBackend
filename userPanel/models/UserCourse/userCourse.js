@@ -21,12 +21,38 @@ const userCourseSchema = new mongoose.Schema({
         default: false
     },
     progress: {
-        type: String
+        type: String,
+        default: '0%'
     },
     paymentStatus: {
         type: Boolean,
         default: false
+    },
+    razorpayOrderId: {
+        type: String,
+        required: false,
+    },
+    razorpayPaymentId: {
+        type: String,
+        required: false,
+    },
+    razorpaySignature: {
+        type: String,
+        required: false,
+    },
+    paymentAmount: {
+        type: Number,
+        required: false,
+    },
+    paymentCurrency: {
+        type: String,
+        default: 'INR',
+        required: false,
+    },
+    paymentDate: {
+        type: Date,
+        required: false,
     }
-},{timestamps:true});
+},{timestamps: true});
 
 module.exports = mongoose.model('userCourse', userCourseSchema);

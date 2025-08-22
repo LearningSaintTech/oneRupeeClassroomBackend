@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 const User = require('../../models/Auth/Auth'); 
 const UserCourse = require('../../models/UserCourse/userCourse'); 
 const Subcourse = require("../../../course/models/subcourse");
-const { apiResponse } = require('../../../utils/apiResponse'); 
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
+const { apiResponse } = require('../../../utils/apiResponse'); 
+const razorpayInstance = require('../../../config/razorpay');
+const crypto = require("crypto");
 
 // Buy course API
 exports.buyCourse = async (req, res) => {
@@ -30,13 +32,22 @@ exports.buyCourse = async (req, res) => {
       });
     }
 
-    // Check if subcourse exists
+    // Check if subcourse exists and fetch certificatePrice
     const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
         statusCode: 404,
+      });
+    }
+
+    // Check if certificatePrice is defined
+    if (!subcourse.certificatePrice || subcourse.certificatePrice <= 0) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid or missing certificate price for the subcourse',
+        statusCode: 400,
       });
     }
 
@@ -48,6 +59,25 @@ exports.buyCourse = async (req, res) => {
         statusCode: 400,
       });
     }
+
+    // Create Razorpay order with shortened receipt
+    const amount = 1;
+    const currency = 'INR';
+    const receipt = `rcpt_${userId.slice(-8)}_${subcourseId.slice(-8)}_${Date.now().toString().slice(-6)}`;
+    if (receipt.length > 40) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Receipt length exceeds Razorpay limit',
+        statusCode: 400,
+      });
+    }
+
+    const order = await razorpayInstance.orders.create({
+      amount: Math.round(amount * 100), // Convert to paise
+      currency,
+      receipt,
+      payment_capture: 1, // Auto-capture payment
+    });
 
     // Check if usermainCourse exists for the user and main course
     let usermainCourse = await UsermainCourse.findOne({
@@ -67,7 +97,7 @@ exports.buyCourse = async (req, res) => {
       await usermainCourse.save();
     }
 
-    // Create or update userCourse entry with paymentStatus set to true
+    // Create or update userCourse entry with payment details
     let userCourse = await UserCourse.findOne({ userId, subcourseId });
 
     if (!userCourse) {
@@ -75,32 +105,33 @@ exports.buyCourse = async (req, res) => {
         userId,
         courseId: subcourse.courseId,
         subcourseId,
-        paymentStatus: true,
+        paymentStatus: false,
         isCompleted: false,
         progress: '0%',
+        razorpayOrderId: order.id,
+        paymentAmount: amount,
+        paymentCurrency: currency,
       });
     } else {
-      userCourse.paymentStatus = true;
+      userCourse.paymentStatus = false;
+      userCourse.razorpayOrderId = order.id;
+      userCourse.paymentAmount = amount;
+      userCourse.paymentCurrency = currency;
     }
 
     await userCourse.save();
 
-    // Add subcourse to user's purchasedsubCourses array
-    user.purchasedsubCourses.push(subcourseId);
-    await user.save();
-
-    // Increment totalStudentsEnrolled in subcourse
-    subcourse.totalStudentsEnrolled += 1;
-    await subcourse.save();
-
+    // Return order details for frontend payment
     return apiResponse(res, {
       success: true,
-      message: 'Subcourse purchased successfully',
+      message: 'Order created successfully, proceed with payment',
       data: {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        key: razorpayInstance.key_id,
         userCourse,
-        usermainCourse, // Include usermainCourse in response
-        purchasedsubCourses: user.purchasedsubCourses,
-        totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+        usermainCourse,
       },
       statusCode: 200,
     });
@@ -109,7 +140,122 @@ exports.buyCourse = async (req, res) => {
     console.error('Error in buyCourse API:', error);
     return apiResponse(res, {
       success: false,
-      message: 'Internal server error',
+      message: `Failed to create order: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+// Verify payment and update status
+exports.verifyPayment = async (req, res) => {
+  try {
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId } = req.body;
+    const userId = req.userId;
+
+    // Validate required fields
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !subcourseId) {
+      console.log('Missing required fields:', { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId });
+      return apiResponse(res, {
+        success: false,
+        message: 'Missing required fields: ' + 
+          (!razorpayOrderId ? 'razorpayOrderId ' : '') +
+          (!razorpayPaymentId ? 'razorpayPaymentId ' : '') +
+          (!razorpaySignature ? 'razorpaySignature ' : '') +
+          (!subcourseId ? 'subcourseId' : ''),
+        statusCode: 400,
+      });
+    }
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log('Invalid ObjectId:', { userId, subcourseId });
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid userId or subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    // Verify payment signature
+    const sign = `${razorpayOrderId}|${razorpayPaymentId}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", razorpayInstance.key_secret)
+      .update(sign)
+      .digest("hex");
+
+    if (expectedSignature !== razorpaySignature) {
+      console.log('Signature verification failed:', { expectedSignature, razorpaySignature });
+      return apiResponse(res, {
+        success: false,
+        message: 'Payment signature verification failed',
+        statusCode: 400,
+      });
+    }
+
+    // Fetch user and subcourse
+    const user = await User.findById(userId);
+    const subcourse = await Subcourse.findById(subcourseId);
+
+    if (!user || !subcourse) {
+      console.log('User or subcourse not found:', { user, subcourse });
+      return apiResponse(res, {
+        success: false,
+        message: 'User or subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    // Update userCourse with payment details
+    let userCourse = await UserCourse.findOne({ userId, subcourseId, razorpayOrderId });
+    if (!userCourse) {
+      userCourse = new UserCourse({
+        userId,
+        courseId: subcourse.courseId,
+        subcourseId,
+        paymentStatus: true,
+        isCompleted: false,
+        progress: '0%',
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature,
+        paymentAmount: subcourse.certificatePrice || 0,
+        paymentCurrency: 'INR',
+        paymentDate: new Date(),
+      });
+    } else {
+      userCourse.paymentStatus = true;
+      userCourse.razorpayPaymentId = razorpayPaymentId;
+      userCourse.razorpaySignature = razorpaySignature;
+      userCourse.paymentDate = new Date();
+    }
+    await userCourse.save();
+
+    // Add subcourse to user's purchasedsubCourses array
+    if (!user.purchasedsubCourses.includes(subcourseId)) {
+      user.purchasedsubCourses.push(subcourseId);
+      user.certificatePaymentStatus = true;
+      await user.save();
+    }
+
+    // Increment totalStudentsEnrolled in subcourse
+    subcourse.totalStudentsEnrolled += 1;
+    await subcourse.save();
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Payment verified and subcourse purchased successfully',
+      data: {
+        userCourse,
+        purchasedsubCourses: user.purchasedsubCourses,
+        totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+      },
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to verify payment: ${error.message}`,
       statusCode: 500,
     });
   }

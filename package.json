@@ -25,6 +25,7 @@
     "mongoose": "^8.17.1",
     "multer": "^2.0.2",
     "puppeteer": "^24.17.0",
+    "razorpay": "^2.9.6",
     "uuid": "^11.1.0"
   }
 }
