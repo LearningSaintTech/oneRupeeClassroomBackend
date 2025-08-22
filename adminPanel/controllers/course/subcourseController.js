@@ -202,7 +202,9 @@ exports.updateSubcourse = async (req, res) => {
             certificateDescription,
             totalLessons,
         } = req.body;
-        const introVideoFile = req.files?.introVideo;
+
+        const introVideoFile = req.files?.introVideoUrl?.[0];
+        console.log("Uploaded files:", { introVideoFile });
 
         // Validate subcourseId
         if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
