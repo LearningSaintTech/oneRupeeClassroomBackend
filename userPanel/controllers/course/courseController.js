@@ -7,7 +7,8 @@ const UserCourse = require("../../models/UserCourse/userCourse");
 const User = require("../../models/Auth/Auth");
 const UserProfile = require("../../models/Profile/userProfile");
 const userLesson = require("../../models/UserCourse/userLesson");
-const Promo = require("../../../Promo/models/promo")
+const Promo = require("../../../Promo/models/promo");
+const subcourse = require('../../../course/models/subcourse');
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -804,6 +805,105 @@ exports.progressBanner = async (req, res) => {
     return apiResponse(res, {
       success: false,
       message: `Failed to fetch progress banner data: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+
+
+exports.getSubcourseNameAndCertDesc = async (req, res) => {
+  try {
+    const { subcourseId } = req.params;
+    console.log(`Fetching subcourse name and certificate description for subcourseId: ${subcourseId}`);
+
+    // Validate subcourseId
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log(`Invalid subcourse ID: ${subcourseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid subcourse ID',
+        statusCode: 400,
+      });
+    }
+
+    // Fetch the subcourse with only subcourseName and certificateDescription
+    const subcourse = await Subcourse.findById(
+      subcourseId,
+      'subcourseName certificateDescription'
+    );
+
+    // Handle case where subcourse is not found
+    if (!subcourse) {
+      console.log(`Subcourse not found for ID: ${subcourseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Subcourse retrieved successfully',
+      data: subcourse,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching subcourse:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch subcourse: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+
+
+
+exports.getCourseNameAndDesc = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    console.log(`Fetching course name and description for courseId: ${courseId}`);
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      console.log(`Invalid course ID: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid course ID',
+        statusCode: 400,
+      });
+    }
+
+    // Fetch the course with only courseName and courseDescription
+    const course = await Course.findById(
+      courseId,
+      'courseName certificateDescription'
+    );
+
+    // Handle case where course is not found
+    if (!course) {
+      console.log(`Course not found for ID: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not found',
+        statusCode: 404,
+      });
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Course retrieved successfully',
+      data: course,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching course:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch course: ${error.message}`,
       statusCode: 500,
     });
   }
