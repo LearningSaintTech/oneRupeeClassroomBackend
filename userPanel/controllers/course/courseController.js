@@ -6,7 +6,8 @@ const Course = require("../../../course/models/course");
 const UserCourse = require("../../models/UserCourse/userCourse");
 const User = require("../../models/Auth/Auth");
 const UserProfile = require("../../models/Profile/userProfile");
-const userLesson = require("../../models/UserCourse/userLesson")
+const userLesson = require("../../models/UserCourse/userLesson");
+const Promo = require("../../../Promo/models/promo")
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -683,6 +684,116 @@ exports.getSubcoursesByCourseId = async (req, res) => {
     return apiResponse(res, {
       success: false,
       message: `Failed to fetch subcourses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+
+
+
+//progress-banner
+exports.progressBanner = async (req, res) => {
+  try {
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching progress banner data for userId: ${userId}`);
+
+    // Validate userId
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Invalid user ID: ${userId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid user ID',
+        statusCode: 400,
+      });
+    }
+
+    let recentSubcourse = null;
+    let recentPurchasedSubcourse = null;
+    let promos = [];
+
+    // 1. Fetch the most recent subcourse (not purchased by the user)
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await User.findById(userId).select('purchasedsubCourses');
+      if (user) {
+        console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
+        recentSubcourse = await Subcourse.findOne(
+          { _id: { $nin: user.purchasedsubCourses || [] } },
+          'subcourseName thumbnailImageUrl totalLessons'
+        ).sort({ createdAt: -1 });
+      } else {
+        console.log(`User not found for ID: ${userId}, fetching most recent subcourse...`);
+        recentSubcourse = await Subcourse.findOne(
+          {},
+          'subcourseName thumbnailImageUrl totalLessons'
+        ).sort({ createdAt: -1 });
+      }
+    } else {
+      console.log(`No userId provided, fetching most recent subcourse...`);
+      recentSubcourse = await Subcourse.findOne(
+        {},
+        'subcourseName thumbnailImageUrl totalLessons'
+      ).sort({ createdAt: -1 });
+    }
+
+    // 2. Fetch the most recent purchased, non-completed subcourse
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      recentPurchasedSubcourse = await UserCourse.findOne(
+        { userId, isCompleted: false, paymentStatus: true },
+        'subcourseId progress'
+      )
+        .populate({
+          path: 'subcourseId',
+          select: 'subcourseName thumbnailImageUrl totalLessons'
+        })
+        .sort({ paymentDate: -1 });
+
+      // Format the response for the purchased subcourse
+      if (recentPurchasedSubcourse && recentPurchasedSubcourse.subcourseId) {
+        recentPurchasedSubcourse = {
+          subcourseName: recentPurchasedSubcourse.subcourseId.subcourseName,
+          thumbnailImageUrl: recentPurchasedSubcourse.subcourseId.thumbnailImageUrl,
+          totalLessons: recentPurchasedSubcourse.subcourseId.totalLessons,
+          progress: recentPurchasedSubcourse.progress
+        };
+      } else {
+        recentPurchasedSubcourse = null;
+      }
+    }
+
+    // 3. Fetch all promos
+    promos = await Promo.find({}, 'promo');
+    console.log(`Found ${promos.length} promos`);
+
+    // Prepare the response
+    const responseData = {
+      recentSubcourse: recentSubcourse || null,
+      recentPurchasedSubcourse: recentPurchasedSubcourse || null,
+      promos: promos || []
+    };
+
+    // Handle case where no data is available
+    if (!recentSubcourse && !recentPurchasedSubcourse && !promos.length) {
+      console.log('No data available for progress banner');
+      return apiResponse(res, {
+        success: true,
+        message: 'No data available',
+        data: responseData,
+        statusCode: 200,
+      });
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Progress banner data retrieved successfully',
+      data: responseData,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching progress banner data:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch progress banner data: ${error.message}`,
       statusCode: 500,
     });
   }

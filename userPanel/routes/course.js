@@ -1,5 +1,5 @@
 const express = require('express');
-const {getAllSubcourses,getPopularCourses,getNewestCourses,getSubcourseById,getLessonById,getAllCourses,getUserPurchasedSubcourses,getEnrolledUsersBySubcourse,getSubcoursesByCourseId} = require('../controllers/course/courseController');
+const {getAllSubcourses,getPopularCourses,getNewestCourses,getSubcourseById,getLessonById,getAllCourses,getUserPurchasedSubcourses,getEnrolledUsersBySubcourse,getSubcoursesByCourseId,progressBanner} = require('../controllers/course/courseController');
 const {verifyToken} = require("../../middlewares/authMiddleware");
 
 
@@ -21,6 +21,10 @@ router.get("/get-enrolled-students/:id",verifyToken,getEnrolledUsersBySubcourse)
 
 
 router.get("/getALLSubcoursesbyId/:courseId",verifyToken,getSubcoursesByCourseId)
+
+
+router.get("/homePage-banner",verifyToken,progressBanner)
+
 
 
 
