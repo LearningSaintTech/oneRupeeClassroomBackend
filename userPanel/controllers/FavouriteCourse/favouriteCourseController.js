@@ -95,9 +95,11 @@ exports.toggleFavourite = async (req, res) => {
 exports.getFavouriteCourses = async (req, res) => {
     try {
         const userId = req.userId; // Assuming userId is set by auth middleware
+        console.log(`Fetching favorite courses for userId: ${userId}`);
 
         // Validate userId
         if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log(`Invalid user ID: ${userId}`);
             return apiResponse(res, {
                 success: false,
                 message: 'Invalid user ID',
@@ -105,12 +107,28 @@ exports.getFavouriteCourses = async (req, res) => {
             });
         }
 
-        // Find all favorite entries for the user where isLike is true
-        const favourites = await Favourite.find({ userId, isLike: true })
-            .populate({
-                path: 'subcourseId',
-                select: 'subcourseName thumbnailImageUrl price rating totalLessons'
+        // Fetch user's purchased subcourses
+        const user = await UserAuth.findById(userId).select('purchasedsubCourses');
+        if (!user) {
+            console.log(`User not found for ID: ${userId}`);
+            return apiResponse(res, {
+                success: false,
+                message: 'User not found',
+                statusCode: 404,
             });
+        }
+        const purchasedSubcourseIds = user.purchasedsubCourses || [];
+        console.log(`Purchased subcourses: ${purchasedSubcourseIds}`);
+
+        // Find favorite entries for the user where isLike is true, excluding purchased subcourses
+        const favourites = await Favourite.find({
+            userId,
+            isLike: true,
+            subcourseId: { $nin: purchasedSubcourseIds }
+        }).populate({
+            path: 'subcourseId',
+            select: 'subcourseName thumbnailImageUrl price avgRating totalLessons'
+        });
 
         // Map favorites to response format
         const favouriteCourses = favourites.map(favourite => {
@@ -120,10 +138,21 @@ exports.getFavouriteCourses = async (req, res) => {
                 subcourseName: subcourse.subcourseName,
                 thumbnailImageUrl: subcourse.thumbnailImageUrl,
                 price: subcourse.price,
-                rating: subcourse.rating,
-                totalLessons:subcourse.totalLessons
+                avgRating: subcourse.avgRating,
+                totalLessons: subcourse.totalLessons
             };
         });
+
+        // Handle case where no favorite courses are available after filtering
+        if (!favouriteCourses.length) {
+            console.log('No favorite courses available after filtering purchased subcourses');
+            return apiResponse(res, {
+                success: true,
+                message: 'No favorite courses available',
+                data: [],
+                statusCode: 200,
+            });
+        }
 
         return apiResponse(res, {
             success: true,
