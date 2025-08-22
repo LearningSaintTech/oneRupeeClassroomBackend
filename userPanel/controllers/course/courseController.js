@@ -69,6 +69,7 @@ exports.getPopularCourses = async (req, res) => {
       .sort({ totalStudentsEnrolled: -1 }); // Descending order
 
     const popularCourses = subcourses.map(subcourse => ({
+      subcourseId:subcourse._id,
       subcourseName: subcourse.subcourseName,
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
       totalLessons: subcourse.totalLessons,
@@ -101,6 +102,7 @@ exports.getNewestCourses = async (req, res) => {
       .sort({ createdAt: -1 }); // Descending order (newest first)
 
     const newestCourses = subcourses.map(subcourse => ({
+      subcourseId:subcourse._id,
       subcourseName: subcourse.subcourseName,
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
       totalLessons: subcourse.totalLessons,

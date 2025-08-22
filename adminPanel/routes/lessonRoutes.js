@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createLesson, getAllLessons, updateLesson,deleteLesson,searchLessons } = require('../controllers/course/lessonController');
+const { createLesson, getAllLessons, updateLesson,deleteLesson,searchLessons ,getLessonsBySubcourseId} = require('../controllers/course/lessonController');
 const { verifyToken } = require('../../middlewares/authMiddleware');
 const multer = require('multer');
 
@@ -15,6 +15,8 @@ router.post('/add-lesson', verifyToken, uploadFields, createLesson);
 router.get('/get-all-lesson', verifyToken, getAllLessons);
 router.put('/update-lesson/:id', verifyToken, uploadFields, updateLesson);
 router.delete('/delete-lesson/:id', verifyToken, deleteLesson);
-router.get("/search-lesson",verifyToken,searchLessons)
+router.get("/search-lesson",verifyToken,searchLessons);
+
+router.get("/get-allLessonsById/:subcourseId",verifyToken,getLessonsBySubcourseId)
 
 module.exports = router;

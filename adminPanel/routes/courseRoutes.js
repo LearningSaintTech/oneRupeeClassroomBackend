@@ -14,4 +14,5 @@ router.put('/update-course/:id', verifyToken, upload.single('coverImage'), updat
 router.delete('/delete-course/:id', verifyToken,deleteCourse);
 router.get('/search-course', verifyToken,searchCourses);
 
+
 module.exports = router;

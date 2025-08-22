@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createSubcourse, getAllSubcourses, updateSubcourse, deleteSubcourse ,searchSubcourses} = require('../controllers/course/subcourseController');
+const { createSubcourse, getAllSubcourses, updateSubcourse, deleteSubcourse ,searchSubcourses,getSubcoursesByCourseId} = require('../controllers/course/subcourseController');
 const { verifyToken } = require('../../middlewares/authMiddleware');
 const multer = require('multer');
 
@@ -16,6 +16,8 @@ router.post('/add-subcourse', verifyToken, uploadFields, createSubcourse);
 router.get('/get-all-subcourses', verifyToken, getAllSubcourses);
 router.put('/update-subcourse/:id', verifyToken, uploadFields, updateSubcourse);
 router.delete("/delete-subcourse/:id", verifyToken, deleteSubcourse);
-router.get("/search-subcourse",verifyToken,searchSubcourses)
+router.get("/search-subcourse",verifyToken,searchSubcourses);
+
+router.get("/get-subCoursesById/:courseId",verifyToken,getSubcoursesByCourseId)
 
 module.exports = router;

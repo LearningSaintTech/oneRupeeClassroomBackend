@@ -411,3 +411,76 @@ exports.searchSubcourses = async (req, res) => {
     });
   }
 };
+
+
+
+exports.getSubcoursesByCourseId = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    console.log(`Fetching subcourses for courseId: ${courseId}`);
+
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      console.log(`Invalid course ID: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid course ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      console.log(`Course not found for ID: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not found',
+        statusCode: 404,
+      });
+    }
+
+    // Fetch all subcourses for the course
+    const subcourses = await Subcourse.find(
+      { courseId: new mongoose.Types.ObjectId(courseId) },
+      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration'
+    );
+
+    // Handle case where no subcourses are found
+    if (!subcourses.length) {
+      console.log(`No subcourses found for courseId: ${courseId}`);
+      return apiResponse(res, {
+        success: true,
+        message: 'No subcourses available for this course',
+        data: [],
+        statusCode: 200,
+      });
+    }
+
+    // Add SNo to each subcourse
+    const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
+      SNo: index + 1,
+      _id: subcourse._id,
+      subcourseName: subcourse.subcourseName,
+      thumbnailImageUrl: subcourse.thumbnailImageUrl,
+      totalLessons: subcourse.totalLessons,
+      price: subcourse.price,
+      avgRating: subcourse.avgRating,
+      subCourseDescription: subcourse.subCourseDescription,
+    }));
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Subcourses retrieved successfully',
+      data: subcoursesWithSNo,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching subcourses by courseId:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch subcourses: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};

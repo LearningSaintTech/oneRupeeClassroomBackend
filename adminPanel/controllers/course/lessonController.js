@@ -663,3 +663,75 @@ exports.searchLessons = async (req, res) => {
     });
   }
 };
+
+
+
+
+exports.getLessonsBySubcourseId = async (req, res) => {
+  try {
+    const { subcourseId } = req.params;
+    console.log(`Fetching lessons for subcourseId: ${subcourseId}`);
+
+    // Validate subcourseId
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log(`Invalid subcourse ID: ${subcourseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid subcourse ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if subcourse exists
+    const subcourse = await Subcourse.findById(subcourseId);
+    if (!subcourse) {
+      console.log(`Subcourse not found for ID: ${subcourseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    // Fetch all lessons for the subcourse
+    const lessons = await Lesson.find(
+      { subcourseId: new mongoose.Types.ObjectId(subcourseId) },
+      'lessonName duration'
+    );
+
+    // Handle case where no lessons are found
+    if (!lessons.length) {
+      console.log(`No lessons found for subcourseId: ${subcourseId}`);
+      return apiResponse(res, {
+        success: true,
+        message: 'No lessons available for this subcourse',
+        data: [],
+        statusCode: 200,
+      });
+    }
+
+    // Add SNo to each lesson
+    const lessonsWithSNo = lessons.map((lesson, index) => ({
+      SNo: index + 1,
+      _id: lesson._id,
+      lessonName: lesson.lessonName,
+      thumbnailImageUrl: lesson.thumbnailImageUrl,
+      duration: lesson.duration,
+      description:lesson.description
+    }));
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Lessons retrieved successfully',
+      data: lessonsWithSNo,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching lessons by subcourseId:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch lessons: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
