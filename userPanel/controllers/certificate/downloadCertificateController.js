@@ -16,7 +16,8 @@ const crypto = require('crypto');
 // Controller for downloading certificate
 exports.downloadCertificate = async (req, res) => {
   try {
-    const { subcourseId } = req.body;
+    console.log("1111")
+    const { subcourseId } = req.params;
     console.log(`[DEBUG] Request received - userId: ${req.userId}, subcourseId: ${subcourseId}`); // Debug log
 
     // Validate input

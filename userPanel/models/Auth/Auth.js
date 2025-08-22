@@ -28,14 +28,6 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    certificatePaymenStatus: {
-        type: Boolean,
-        default: false
-    },
-    internshipPaymentStatus: {
-        type: Boolean,
-        default: false
-    },
     purchasedsubCourses:
         [
             {

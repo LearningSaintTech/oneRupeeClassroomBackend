@@ -6,6 +6,6 @@ const {verifyToken} = require("../../middlewares/authMiddleware");
 
 const router = express.Router();
 
-router.get("/download-certificate",verifyToken,downloadCertificate);
+router.get("/download-certificate/:subcourseId",verifyToken,downloadCertificate);
 
 module.exports = router;

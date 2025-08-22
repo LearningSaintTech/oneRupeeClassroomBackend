@@ -233,7 +233,6 @@ exports.verifyPayment = async (req, res) => {
     // Add subcourse to user's purchasedsubCourses array
     if (!user.purchasedsubCourses.includes(subcourseId)) {
       user.purchasedsubCourses.push(subcourseId);
-      user.certificatePaymenStatus = true;
       await user.save();
     }
 
