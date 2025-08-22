@@ -20,7 +20,7 @@ router.get("/get-purchased-course",verifyToken,getUserPurchasedSubcourses)
 router.get("/get-enrolled-students/:id",verifyToken,getEnrolledUsersBySubcourse)
 
 
-router.get("/getSubcoursesbyId/:courseId",verifyToken,getSubcoursesByCourseId)
+router.get("/getALLSubcoursesbyId/:courseId",verifyToken,getSubcoursesByCourseId)
 
 
 
