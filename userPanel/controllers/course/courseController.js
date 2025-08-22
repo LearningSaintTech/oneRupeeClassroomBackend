@@ -590,9 +590,11 @@ exports.getSubcoursesByCourseId = async (req, res) => {
   try {
     const { courseId } = req.params;
     const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching subcourses for courseId: ${courseId}, userId: ${userId}`);
 
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      console.log(`Invalid course ID: ${courseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid course ID',
@@ -600,9 +602,10 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       });
     }
 
-    // Check if course exists
-    const course = await Course.findById(courseId);
+    // Check if course exists and fetch courseName
+    const course = await Course.findById(courseId).select('courseName');
     if (!course) {
+      console.log(`Course not found for ID: ${courseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Course not found',
@@ -667,7 +670,9 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       }
     ]);
 
+    // Handle case where no subcourses are found
     if (!subcourses.length) {
+      console.log(`No subcourses found for courseId: ${courseId}`);
       return apiResponse(res, {
         success: false,
         message: 'No subcourses found for this course',
@@ -678,7 +683,10 @@ exports.getSubcoursesByCourseId = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Subcourses retrieved successfully',
-      data: subcourses,
+      data: {
+        courseName: course.courseName,
+        subcourses: subcourses
+      },
       statusCode: 200,
     });
   } catch (error) {
@@ -690,7 +698,6 @@ exports.getSubcoursesByCourseId = async (req, res) => {
     });
   }
 };
-
 
 
 
