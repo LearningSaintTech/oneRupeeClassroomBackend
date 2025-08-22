@@ -258,6 +258,14 @@ exports.downloadMainCourseCertificate = async (req, res) => {
     });
     await browser.close();
 
+    // Update isCertificateDownloaded to true
+    console.log(`[DEBUG] Updating isCertificateDownloaded for userId: ${req.userId}, courseId: ${courseId}`);
+    await usermainCourse.updateOne(
+      { userId: req.userId, courseId, isCompleted: true },
+      { $set: { isCertificateDownloaded: true } }
+    );
+    console.log('[DEBUG] isCertificateDownloaded updated successfully');
+
     console.log('[DEBUG] PDF generated successfully, buffer length:', pdfBuffer.length);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="certificate_${certificateId}.pdf"`);

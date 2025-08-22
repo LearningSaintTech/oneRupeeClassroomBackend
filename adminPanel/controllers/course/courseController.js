@@ -32,6 +32,7 @@ exports.createCourse = async (req, res) => {
       courseName,
       CoverImageUrl: coverImageUrl,
       certificateDescription,
+      CourseInternshipPrice
     });
 
     await course.save();
@@ -86,7 +87,7 @@ exports.getAllCourses = async (req, res) => {
 exports.updateCourse = async (req, res) => {
   try {
     const courseId = req.params.id;
-    const { courseName, certificateDescription } = req.body;
+    const { courseName, certificateDescription ,CourseInternshipPrice} = req.body;
     const file = req.file;
 
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -115,6 +116,10 @@ exports.updateCourse = async (req, res) => {
     // Update certificate description if provided
     if (certificateDescription) {
       course.certificateDescription = certificateDescription;
+    }
+
+    if(CourseInternshipPrice){
+      course.CourseInternshipPrice = CourseInternshipPrice;
     }
 
     // Update cover image if new file is provided
