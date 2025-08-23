@@ -9,7 +9,7 @@ const { apiResponse } = require("../../../utils/apiResponse");
 exports.createCourse = async (req, res) => {
   try {
     const adminId = req.userId;
-    const { courseName, certificateDescription } = req.body;
+    const { courseName, certificateDescription ,CourseInternshipPrice} = req.body;
     const file = req.file;
 
     if (!courseName || !certificateDescription || !file) {
