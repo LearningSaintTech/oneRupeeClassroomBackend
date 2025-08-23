@@ -22,6 +22,8 @@ const enrolledStudentsRoutes = require("./adminPanel/routes/enrolledStudents");
 const totalusersRoutes = require("./adminPanel/routes/users");
 const promoRoutes = require("./Promo/routes/promoRoutes");
 const getAllRatings = require("./adminPanel/routes/ratings");
+const InternshipLetter = require("./userPanel/routes/internshipLetter");
+const uploadInternshipLetter = require("./adminPanel/routes/uploadInternshipLetter");
 
 
 require('dotenv').config();
@@ -48,6 +50,7 @@ app.use("/api/user/mark",markCompleted);
 app.use("/api/user/rating",ratingRoutes);
 app.use("/api/user/search",searchRoutes);
 app.use("/api/user/certificate",downloadCertificateRoutes);
+app.use("/api/user/internshipLetter",InternshipLetter);
 
 
 
@@ -62,6 +65,7 @@ app.use("/api/admin/students",enrolledStudentsRoutes);
 app.use("/api/admin/profile",adminProfileRoutes);
 app.use("/api/admin/users",totalusersRoutes);
 app.use("/api/admin/ratings",getAllRatings);
+app.use("/api/admin/upload",uploadInternshipLetter);
 
 
 app.use("/api/promo",promoRoutes)

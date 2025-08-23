@@ -11,12 +11,18 @@ const internshipLetterSchema = new mongoose.Schema({
         ref: "course",
         required: true,
     },
-    internshipLetter:{
-        type:String
+    internshipLetter: {
+        type: String,
+        default:""
     },
     paymentStatus: {
         type: Boolean,
         default: false
+    },
+    uploadStatus: {
+        type: String,
+        enum: ["upload", "uploaded"],
+        default:"upload"
     },
     razorpayOrderId: {
         type: String,
@@ -43,6 +49,6 @@ const internshipLetterSchema = new mongoose.Schema({
         type: Date,
         required: false,
     }
-},{timestamps: true});
+}, { timestamps: true });
 
-module.exports = mongoose.model('internshipLetterSchema', internshipLetterSchema);
+module.exports = mongoose.model('internshipLetter', internshipLetterSchema);

@@ -9,6 +9,7 @@ const UserProfile = require("../../models/Profile/userProfile");
 const userLesson = require("../../models/UserCourse/userLesson");
 const Promo = require("../../../Promo/models/promo");
 const subcourse = require('../../../course/models/subcourse');
+const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -590,7 +591,7 @@ exports.getEnrolledUsersBySubcourse = async (req, res) => {
 exports.getSubcoursesByCourseId = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    const userId = req.userId; 
     console.log(`Fetching subcourses for courseId: ${courseId}, userId: ${userId}`);
 
     // Validate courseId
@@ -613,6 +614,10 @@ exports.getSubcoursesByCourseId = async (req, res) => {
         statusCode: 404,
       });
     }
+
+    // Fetch user course completion status
+    const userCourse = await UsermainCourse.findOne({ userId, courseId }).select('isCompleted');
+    const isCourseCompleted = userCourse ? userCourse.isCompleted : false;
 
     // Fetch subcourses with thumbnail, price, totalLessons, isLike, and avgRating
     const subcourses = await Subcourse.aggregate([
@@ -686,7 +691,8 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       message: 'Subcourses retrieved successfully',
       data: {
         courseName: course.courseName,
-        subcourses: subcourses
+        isCourseCompleted, // Added isCompleted flag
+        subcourses
       },
       statusCode: 200,
     });
@@ -699,7 +705,6 @@ exports.getSubcoursesByCourseId = async (req, res) => {
     });
   }
 };
-
 
 
 //progress-banner
