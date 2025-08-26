@@ -134,6 +134,7 @@ exports.getFavouriteCourses = async (req, res) => {
         const favouriteCourses = favourites.map(favourite => {
             const subcourse = favourite.subcourseId;
             return {
+                id:favourite.subcourseId,
                 isLike: favourite.isLike,
                 subcourseName: subcourse.subcourseName,
                 thumbnailImageUrl: subcourse.thumbnailImageUrl,
