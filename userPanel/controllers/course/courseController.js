@@ -71,7 +71,7 @@ exports.getPopularCourses = async (req, res) => {
       .sort({ totalStudentsEnrolled: -1 }); // Descending order
 
     const popularCourses = subcourses.map(subcourse => ({
-      _id:subcourse._id,
+      _id: subcourse._id,
       subcourseName: subcourse.subcourseName,
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
       totalLessons: subcourse.totalLessons,
@@ -104,7 +104,7 @@ exports.getNewestCourses = async (req, res) => {
       .sort({ createdAt: -1 }); // Descending order (newest first)
 
     const newestCourses = subcourses.map(subcourse => ({
-      _id:subcourse._id,
+      _id: subcourse._id,
       subcourseName: subcourse.subcourseName,
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
       totalLessons: subcourse.totalLessons,
@@ -238,6 +238,7 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: { $first: '$totalDuration' },
           subCourseDescription: { $first: '$subCourseDescription' },
           totalLessons: { $first: '$totalLessons' },
+          price:{$first:'$price'},
           lessons: {
             $push: {
               lessonId: '$lessons._id',
@@ -267,6 +268,7 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: 1,
           subCourseDescription: 1,
           totalLessons: 1,
+          price:1,
           lessons: 1,
           isBestSeller: {
             $cond: {
@@ -591,7 +593,7 @@ exports.getEnrolledUsersBySubcourse = async (req, res) => {
 exports.getSubcoursesByCourseId = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.userId; 
+    const userId = req.userId;
     console.log(`Fetching subcourses for courseId: ${courseId}, userId: ${userId}`);
 
     // Validate courseId
@@ -751,8 +753,18 @@ exports.progressBanner = async (req, res) => {
       ).sort({ createdAt: -1 });
     }
 
+
     // 2. Fetch the most recent purchased, non-completed subcourse
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      console.log("Checking for recent purchased subcourse...");
+
+      // Log the filters before querying
+      console.log("Query filters:", {
+        userId,
+        isCompleted: false,
+        paymentStatus: true
+      });
+
       recentPurchasedSubcourse = await UserCourse.findOne(
         { userId, isCompleted: false, paymentStatus: true },
         'subcourseId progress'
@@ -762,6 +774,22 @@ exports.progressBanner = async (req, res) => {
           select: 'subcourseName thumbnailImageUrl totalLessons'
         })
         .sort({ paymentDate: -1 });
+
+      console.log("Raw recentPurchasedSubcourse query result:", recentPurchasedSubcourse);
+
+      // Check if the query returned a result
+      if (!recentPurchasedSubcourse) {
+        console.log("No UserCourse found matching the filters. Debugging possible reasons...");
+        // Check what records exist for the user
+        const allUserCourses = await UserCourse.find({ userId });
+        console.log("All UserCourse entries for user:", allUserCourses);
+
+        const paidCourses = await UserCourse.find({ userId, paymentStatus: true });
+        console.log("Paid UserCourse entries for user:", paidCourses);
+
+        const incompleteCourses = await UserCourse.find({ userId, isCompleted: false });
+        console.log("Incomplete UserCourse entries for user:", incompleteCourses);
+      }
 
       // Format the response for the purchased subcourse
       if (recentPurchasedSubcourse && recentPurchasedSubcourse.subcourseId) {
@@ -776,7 +804,6 @@ exports.progressBanner = async (req, res) => {
         recentPurchasedSubcourse = null;
       }
     }
-
     // 3. Fetch all promos
     promos = await Promo.find({}, 'promo');
     console.log(`Found ${promos.length} promos`);
