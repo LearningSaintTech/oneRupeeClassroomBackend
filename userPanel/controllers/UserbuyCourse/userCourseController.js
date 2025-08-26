@@ -5,6 +5,7 @@ const Subcourse = require("../../../course/models/subcourse");
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 const { apiResponse } = require('../../../utils/apiResponse'); 
 const razorpayInstance = require('../../../config/razorpay');
+const NotificationService = require('../../../Notification/controller/notificationService');
 const crypto = require("crypto");
 
 // Buy course API
@@ -146,6 +147,7 @@ exports.buyCourse = async (req, res) => {
   }
 };
 
+
 // Verify payment and update status
 exports.verifyPayment = async (req, res) => {
   try {
@@ -179,9 +181,9 @@ exports.verifyPayment = async (req, res) => {
     // Verify payment signature
     const sign = `${razorpayOrderId}|${razorpayPaymentId}`;
     const expectedSignature = crypto
-      .createHmac("sha256", razorpayInstance.key_secret)
+      .createHmac('sha256', razorpayInstance.key_secret)
       .update(sign)
-      .digest("hex");
+      .digest('hex');
 
     if (expectedSignature !== razorpaySignature) {
       console.log('Signature verification failed:', { expectedSignature, razorpaySignature });
@@ -239,6 +241,37 @@ exports.verifyPayment = async (req, res) => {
     // Increment totalStudentsEnrolled in subcourse
     subcourse.totalStudentsEnrolled += 1;
     await subcourse.save();
+
+    // Use a placeholder ObjectId for system-generated notifications
+    const systemSenderId = new mongoose.Types.ObjectId(); // Generate a new ObjectId for system sender
+
+    // Create and send notification for successful enrollment
+    const notificationData = {
+      recipientId: userId,
+      senderId: systemSenderId, // Use placeholder senderId
+      title: 'Subcourse Unlocked',
+      body: `You have successfully enrolled in ${subcourse.subcourseName}. Start learning now!`,
+      type: 'course_unlocked',
+      data: {
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
+      },
+    };
+
+    // Save and send notification
+    const notification = await NotificationService.createAndSendNotification(notificationData);
+
+    // Emit real-time notification via WebSocket (Socket.IO)
+    const io = req.app.get('io');
+    if (io) {
+      io.to(userId.toString()).emit('new_notification', {
+        id: notification._id, // Use the actual notification ID from the saved notification
+        title: notificationData.title,
+        body: notificationData.body,
+        type: notificationData.type,
+        createdAt: notification.createdAt,
+      });
+    }
 
     return apiResponse(res, {
       success: true,

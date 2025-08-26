@@ -6,6 +6,7 @@ const razorpayInstance = require('../../../config/razorpay');
 const UserAuth = require("../../models/Auth/Auth")
 const { apiResponse } = require('../../../utils/apiResponse');
 const UsermainCourse = require('../../models/UserCourse/usermainCourse');
+const NotificationService = require("../../../Notification/controller/notificationService")
 
 // Request Internship Letter and Create Razorpay Order
 const requestInternshipLetter = async (req, res) => {
@@ -67,7 +68,7 @@ const requestInternshipLetter = async (req, res) => {
         // Create Razorpay order with a shorter receipt
         const receipt = `r_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
         const orderOptions = {
-            amount: course.CourseInternshipPrice * 100, // Convert to paise
+            amount: 1 * 100, // Convert to paise
             currency: 'INR',
             receipt: receipt,
         };
@@ -107,8 +108,8 @@ const requestInternshipLetter = async (req, res) => {
 const updatePaymentStatus = async (req, res) => {
     try {
         const { internshipLetterId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-        console.log("dataa", internshipLetterId, razorpayOrderId, razorpayPaymentId, razorpaySignature);
         const userId = req.userId;
+        const io = req.app.get('io');
 
         // Validate internshipLetterId
         if (!mongoose.Types.ObjectId.isValid(internshipLetterId)) {
@@ -141,14 +142,12 @@ const updatePaymentStatus = async (req, res) => {
             .digest("hex");
 
         if (expectedSignature !== razorpaySignature) {
-            console.log('Signature verification failed:', { expectedSignature, razorpaySignature });
             return apiResponse(res, {
                 success: false,
                 message: 'Payment signature verification failed',
                 statusCode: 400,
             });
         }
-
 
         // Update payment details
         internshipLetter.paymentStatus = true;
@@ -159,6 +158,27 @@ const updatePaymentStatus = async (req, res) => {
         internshipLetter.paymentDate = new Date();
 
         await internshipLetter.save();
+        // Fetch courseName and userName
+        const course = await Course.findById(internshipLetter.courseId).select('courseName');
+        const user = await UserAuth.findById(userId).select('fullName');
+
+        // Send notification to admins
+        const notificationData = {
+            senderId: userId,
+            title: 'Internship Letter upload request',
+            body: `Upload internship letter Course=${course.courseName},UserName=${user.fullName}`,
+            type: 'internship_letter_payment',
+            data: {
+                internshipLetterId: internshipLetter._id,
+                courseId: internshipLetter.courseId,
+                userId: internshipLetter.userId,
+                Status:internshipLetter.uploadStatus,
+                PaymentStatus:internshipLetter.paymentStatus
+            },
+            createdAt: new Date(),
+        };
+
+        await NotificationService.sendAdminNotification(notificationData);
 
         return apiResponse(res, {
             success: true,
@@ -167,7 +187,7 @@ const updatePaymentStatus = async (req, res) => {
             statusCode: 200,
         });
     } catch (error) {
-        console.error('Error updating payment status:', error);
+        console.error('Error updating payment status:', error.message);
         return apiResponse(res, {
             success: false,
             message: 'Server error',
