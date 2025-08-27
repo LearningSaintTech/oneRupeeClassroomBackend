@@ -70,20 +70,28 @@ app.set('io', io);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
+  console.log(`🔗 [Socket Connected] Socket ID: ${socket.id}, Timestamp: ${new Date().toISOString()}`);
+  
   socket.on('join', (userId) => {
+    console.log(`📌 [Join Event] User ID: ${userId} joined room with Socket ID: ${socket.id}, Timestamp: ${new Date().toISOString()}`);
     socket.join(userId);
+    console.log(`✅ [Room Joined] Current rooms for socket ${socket.id}:`, socket.rooms, `Timestamp: ${new Date().toISOString()}`);
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', (reason) => {
+    console.log(`❌ [Socket Disconnected] Socket ID: ${socket.id}, Reason: ${reason}, Timestamp: ${new Date().toISOString()}`);
+  });
 });
 
 // Schedule task to send lesson reminders every minute
 const startLessonReminder = async () => {
+  console.log(`⏰ [Cron Started] Lesson reminder cron job initiated, Timestamp: ${new Date().toISOString()}`);
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const currentTime = now.getTime();
+      console.log(`🔍 [Cron Run] Checking lessons for reminders, Current Time: ${now.toISOString()}`);
 
       // Find lessons scheduled for today
       const lessons = await Lesson.find({
@@ -92,14 +100,21 @@ const startLessonReminder = async () => {
           $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
         },
       });
+      console.log(`📚 [Lessons Found] ${lessons.length} lessons scheduled for today`);
 
       for (const lesson of lessons) {
         const lessonDate = new Date(lesson.date);
-        if (lessonDate.getDate() !== today.getDate()) continue;
+        if (lessonDate.getDate() !== today.getDate()) {
+          console.log(`⏭️ [Skipped Lesson] Lesson ${lesson.lessonName} not for today`);
+          continue;
+        }
 
         const startTime = lesson.startTime;
         const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(startTime)) continue;
+        if (!timeRegex.test(startTime)) {
+          console.log(`⚠️ [Invalid Time] Lesson ${lesson.lessonName} has invalid startTime: ${startTime}`);
+          continue;
+        }
 
         const [startHours, startMinutes] = startTime.split(':').map(Number);
         const lessonStartTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHours, startMinutes).getTime();
@@ -115,9 +130,16 @@ const startLessonReminder = async () => {
         }
 
         if (reminderType) {
+          console.log(`🔔 [Reminder Triggered] Lesson: ${lesson.lessonName}, Type: ${reminderType}, Lesson ID: ${lesson._id}`);
+          
           // Find enrolled users
           const enrolledUsers = await UserCourse.find({ subcourseId: lesson.subcourseId }).select('userId');
-          if (enrolledUsers.length === 0) continue;
+          console.log(`👥 [Enrolled Users] Found ${enrolledUsers.length} users for lesson ${lesson.lessonName}`);
+          
+          if (enrolledUsers.length === 0) {
+            console.log(`⚠️ [No Users] No enrolled users for lesson ${lesson.lessonName}`);
+            continue;
+          }
 
           const notificationData = {
             recipientId: null, // Will be set for each user
@@ -134,6 +156,7 @@ const startLessonReminder = async () => {
 
           for (const { userId } of enrolledUsers) {
             notificationData.recipientId = userId;
+            console.log(`📨 [Sending Notification] To User ID: ${userId}, Lesson: ${lesson.lessonName}`);
             io.to(userId.toString()).emit('lesson_notification', notificationData);
             try {
               await NotificationService.createAndSendNotification({
@@ -147,20 +170,22 @@ const startLessonReminder = async () => {
                   subcourseId: lesson.subcourseId,
                 },
               });
+              console.log(`✅ [Notification Sent] To User ID: ${userId}, Lesson: ${lesson.lessonName}`);
             } catch (notificationError) {
-              console.error(`Error sending Firebase notification to user ${userId}:`, notificationError.message);
+              console.error(`❌ [Notification Error] Failed to send to User ID: ${userId}, Error: ${notificationError.message}`);
             }
           }
         }
       }
     } catch (error) {
-      console.error('Error in lesson reminder check:', error.message);
+      console.error(`❌ [Cron Error] Lesson reminder check failed: ${error.message}, Timestamp: ${new Date().toISOString()}`);
     }
   });
 };
 
 // Start reminder after MongoDB connection
 mongoose.connection.once('open', () => {
+  console.log(`✅ [MongoDB Connected] Starting lesson reminder cron job`);
   startLessonReminder();
 });
 
@@ -198,5 +223,5 @@ app.use("/api/promo", promoRoutes);
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 [Server Started] Running on port ${PORT}, Timestamp: ${new Date().toISOString()}`);
 });
