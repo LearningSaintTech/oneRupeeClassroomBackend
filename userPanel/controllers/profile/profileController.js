@@ -1,8 +1,18 @@
 const UserProfile = require('../../models/Profile/userProfile');
+const UserLesson = require("../../models/UserCourse/userLesson")
 const UserAuth = require('../../models/Auth/Auth');
-const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
-const { apiResponse } = require("../../../utils/apiResponse");
+const UserCourse = require('../../models/UserCourse/userCourse');
+// const UserLesson = require('../../models/UserCourse/userlesson');
+const UserMainCourse = require('../../models/UserCourse/usermainCourse');
+const Notification = require('../../../Notification/model/notification');
+const Rating = require('../../models/Rating/rating');
+const FCMToken = require('../../../Notification/model/fcmToken');
+const Favourite = require('../../models/Favourite/favouriteCourse');
+const { deleteImage } = require('../../../utils/s3Functions');
+const { apiResponse } = require('../../../utils/apiResponse');
 const mongoose = require('mongoose');
+
+
 
 // // Create a new user profile (POST)
 // exports.createUserProfile = async (req, res) => {
@@ -348,4 +358,102 @@ exports.getProfileInfo = async (req, res) => {
             statusCode: 500,
         });
     }
+};
+
+// Delete a user profile and associated data (DELETE)
+exports.deleteUserProfile = async (req, res) => {
+  try {
+    // Validate userId from auth middleware
+    if (!req.userId || !mongoose.Types.ObjectId.isValid(req.userId)) {
+      console.log("Invalid or missing userId:", req.userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid or missing user ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if user exists in UserAuth
+    const user = await UserAuth.findById(req.userId);
+    if (!user) {
+      console.log("User not found for userId:", req.userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Find user profile
+    const userProfile = await UserProfile.findOne({ userId: req.userId });
+    if (!userProfile) {
+      console.log("Profile not found for userId:", req.userId);
+      return apiResponse(res, {
+        success: false,
+        message: 'User profile not found',
+        statusCode: 404,
+      });
+    }
+
+    // Delete profile image from S3 if it exists
+    if (userProfile.profileImageUrl) {
+      console.log("Deleting profile image from S3:", userProfile.profileImageUrl);
+      await deleteImage(userProfile.profileImageUrl);
+      console.log("Profile image deleted from S3");
+    }
+
+    // Delete all user courses
+    await UserCourse.deleteMany({ userId: req.userId });
+    console.log("All user courses deleted for userId:", req.userId);
+
+    // Delete all user lessons
+    await UserLesson.deleteMany({ userId: req.userId });
+    console.log("All user lessons deleted for userId:", req.userId);
+
+    // Delete all user main courses
+    await UserMainCourse.deleteMany({ userId: req.userId });
+    console.log("All user main courses deleted for userId:", req.userId);
+
+    // Delete all notifications where user is either recipient or sender
+    await Notification.deleteMany({
+      $or: [
+        { recipientId: req.userId },
+        { senderId: req.userId }
+      ]
+    });
+    console.log("All notifications deleted for userId:", req.userId);
+
+    // Delete all ratings by the user
+    await Rating.deleteMany({ userId: req.userId });
+    console.log("All ratings deleted for userId:", req.userId);
+
+    // Delete all favorites by the user
+    await Favourite.deleteMany({ userId: req.userId });
+    console.log("All favorites deleted for userId:", req.userId);
+
+    // Delete the user profile
+    await UserProfile.deleteOne({ userId: req.userId });
+    console.log("User profile deleted for userId:", req.userId);
+
+       // Delete all FCM tokens for the user
+    await FCMToken.deleteMany({ userId: req.userId });
+    console.log("All FCM tokens deleted for userId:", req.userId);
+
+    // Delete the UserAuth record
+    await UserAuth.deleteOne({ _id: req.userId });
+    console.log("User authentication record deleted for userId:", req.userId);
+
+    return apiResponse(res, {
+      success: true,
+      message: 'User profile and all associated data deleted successfully',
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error deleting user profile:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to delete user profile: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };

@@ -1,5 +1,5 @@
 const express = require('express');
-const {createUserProfile,updateUserProfile,getUserProfile,getUserbasicInfo,getProfileInfo} = require('../controllers/profile/profileController');
+const {createUserProfile,updateUserProfile,getUserProfile,getUserbasicInfo,getProfileInfo,deleteUserProfile} = require('../controllers/profile/profileController');
 const {verifyToken} = require("../../middlewares/authMiddleware");
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -14,7 +14,12 @@ router.get('/get-profile', verifyToken,getUserProfile);
 router.get("/getUser-basicInfo",verifyToken,getUserbasicInfo)
 router.get("/getProfileInfo",verifyToken,getProfileInfo)
 
+router.delete("/delete-profile",verifyToken,deleteUserProfile)
 
 router.post("/upload-image",upload.single('logo'),imageUploadController)
+
+
+
+
 
 module.exports = router;
