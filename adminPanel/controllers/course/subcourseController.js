@@ -469,6 +469,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       price: subcourse.price,
       avgRating: subcourse.avgRating,
       subCourseDescription: subcourse.subCourseDescription,
+      totalDuration:subcourse.totalDuration
     }));
 
     return apiResponse(res, {

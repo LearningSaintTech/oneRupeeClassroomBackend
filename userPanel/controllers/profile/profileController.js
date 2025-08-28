@@ -2,7 +2,6 @@ const UserProfile = require('../../models/Profile/userProfile');
 const UserLesson = require("../../models/UserCourse/userLesson")
 const UserAuth = require('../../models/Auth/Auth');
 const UserCourse = require('../../models/UserCourse/userCourse');
-// const UserLesson = require('../../models/UserCourse/userlesson');
 const UserMainCourse = require('../../models/UserCourse/usermainCourse');
 const Notification = require('../../../Notification/model/notification');
 const Rating = require('../../models/Rating/rating');
