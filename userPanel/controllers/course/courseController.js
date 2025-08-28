@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
-const Subcourse = require('../../../course/models/subcourse');
+const Subcourse = require('../../../adminPanel/models/course/subcourse');
 const { apiResponse } = require('../../../utils/apiResponse');
-const Lesson = require("../../../course/models/lesson");
-const Course = require("../../../course/models/course");
+const Lesson = require("../../../adminPanel/models/course/lesson");
+const Course = require("../../../adminPanel/models/course/course");
 const UserCourse = require("../../models/UserCourse/userCourse");
 const User = require("../../models/Auth/Auth");
 const UserProfile = require("../../models/Profile/userProfile");
 const userLesson = require("../../models/UserCourse/userLesson");
 const Promo = require("../../../Promo/models/promo");
-const subcourse = require('../../../course/models/subcourse');
+const subcourse = require('../../../adminPanel/models/course/subcourse');
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 
 // Get all subcourses with details

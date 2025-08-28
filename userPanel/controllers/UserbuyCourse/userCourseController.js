@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const User = require('../../models/Auth/Auth'); 
 const UserCourse = require('../../models/UserCourse/userCourse'); 
-const Subcourse = require("../../../course/models/subcourse");
+const Subcourse = require("../../../adminPanel/models/course/subcourse");
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 const { apiResponse } = require('../../../utils/apiResponse'); 
 const razorpayInstance = require('../../../config/razorpay');
-const NotificationService = require('../../../Notification/controller/notificationService');
+const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const crypto = require("crypto");
 
 // Buy course API

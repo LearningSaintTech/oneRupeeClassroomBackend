@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requestInternshipLetter, updatePaymentStatus } = require('../controllers/InternshipLetter/internshipLetter');
+const { requestInternshipLetter, updatePaymentStatus } = require('../controllers/InternshipLetter/internshipLetterController');
 const {verifyToken} = require('../../middlewares/authMiddleware');
 
 // Routes

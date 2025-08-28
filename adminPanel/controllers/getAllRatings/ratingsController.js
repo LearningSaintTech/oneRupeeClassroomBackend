@@ -1,4 +1,4 @@
-const Subcourse = require("../../../course/models/subcourse");
+const Subcourse = require("../../models/course/subcourse");
 const {apiResponse} = require("../../../utils/apiResponse");
 const {exportToCsv} = require("../../../utils/exportToCsv");
 

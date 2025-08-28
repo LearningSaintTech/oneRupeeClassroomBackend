@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Favourite = require('../../models/Favourite/favouriteCourse');
-const Subcourse = require('../../../course/models/subcourse');
+const Subcourse = require('../../../adminPanel/models/course/subcourse');
 const { apiResponse } = require('../../../utils/apiResponse');
 const UserAuth = require("../../models/Auth/Auth");
 

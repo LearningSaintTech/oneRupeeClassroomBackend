@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 const User = require('../../models/Auth/Auth');
-const Lesson = require('../../../course/models/lesson');
+const Lesson = require('../../../adminPanel/models/course/lesson');
 const UserLesson = require('../../models/UserCourse/userLesson');
 const UserCourse = require('../../models/UserCourse/userCourse');
 const UsermainCourse = require('../../models/UserCourse/usermainCourse');
-const Subcourse = require('../../../course/models/subcourse');
+const Subcourse = require('../../../adminPanel/models/course/subcourse');
 const { apiResponse } = require('../../../utils/apiResponse');
 
 exports.handleMarkLessonCompleted = async (req, res) => {

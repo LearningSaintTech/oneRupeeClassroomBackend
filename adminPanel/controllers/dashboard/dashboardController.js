@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const Course = require("../../../course/models/course");
+const Course = require("../../models/course/course");
 const User = require("../../../userPanel/models/Auth/Auth");
 const { apiResponse } = require('../../../utils/apiResponse'); 
 const UsermainCourse = require("../../../userPanel/models/UserCourse/usermainCourse");

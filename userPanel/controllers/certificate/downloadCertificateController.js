@@ -1,13 +1,13 @@
 const puppeteer = require('puppeteer');
 const mongoose = require('mongoose');
 const User = require('../../models/Auth/Auth');
-const Subcourse = require('../../../course/models/subcourse');
+const Subcourse = require('../../../adminPanel/models/course/subcourse');
 const Template = require('../../../adminPanel/models/Templates/certificateTemplate');
 const UserCourse = require("../../models/UserCourse/userCourse")
 const CertificateTemplate = require("../../../adminPanel/models/Templates/certificateTemplate")
 const { apiResponse } = require('../../../utils/apiResponse');
 const usermainCourse = require("../../models/UserCourse/usermainCourse");
-const Course = require("../../../course/models/course");
+const Course = require("../../../adminPanel/models/course/course");
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment-timezone');
 const pdf = require('html-pdf');

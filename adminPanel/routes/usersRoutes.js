@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {getPurchasedMainCourseUsers,exportUsersToCsv ,searchUsers} = require('../controllers/Users/users');
+const {getPurchasedMainCourseUsers,exportUsersToCsv ,searchUsers} = require('../controllers/Users/usersController');
 const { verifyToken } = require('../../middlewares/authMiddleware');
 
 

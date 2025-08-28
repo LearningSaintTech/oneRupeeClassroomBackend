@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadInternshipLetter } = require('../controllers/uploadInternshipLetter/uploadInternshipLetter');
+const { uploadInternshipLetter } = require('../controllers/uploadInternshipLetter/uploadInternshipLetterController');
 const {verifyToken} = require('../../middlewares/authMiddleware');
 const multer = require('multer');
 

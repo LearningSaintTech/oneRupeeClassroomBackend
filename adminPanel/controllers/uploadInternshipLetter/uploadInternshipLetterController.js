@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-const InternshipLetter = require('../../../InternshipLetter/models/internshipLetter');
-const Course = require('../../../course/models/course');
+const InternshipLetter = require('../../models/InternshipLetter/internshipLetter');
+const Course = require('../../models/course/course');
 const { apiResponse } = require('../../../utils/apiResponse');
 const { uploadImage } = require('../../../utils/s3Functions');
 const path = require('path');
-const NotificationService = require('../../../Notification/controller/notificationService');
+const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const Admin = require('../../models/Auth/auth');
 
 // Upload Internship Letter and Update Status

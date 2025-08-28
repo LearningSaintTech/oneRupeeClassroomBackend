@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {updateAdminProfile,getAdminProfileDetails } = require('../controllers/profile/profile');
+const {updateAdminProfile,getAdminProfileDetails } = require('../controllers/profile/profileController');
 const { verifyToken } = require('../../middlewares/authMiddleware');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });

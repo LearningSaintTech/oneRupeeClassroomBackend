@@ -1,4 +1,4 @@
-const NotificationService = require('./notificationService');
+const NotificationService = require('./notificationServiceController');
 const FCMToken = require('../model/fcmToken'); // Adjust path as needed
 const { apiResponse } = require('../../utils/apiResponse'); // Adjust path as needed
 

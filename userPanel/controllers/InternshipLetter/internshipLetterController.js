@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const InternshipLetter = require('../../../InternshipLetter/models/internshipLetter');
-const Course = require('../../../course/models/course');
+const InternshipLetter = require('../../../adminPanel/models/InternshipLetter/internshipLetter');
+const Course = require('../../../adminPanel/models/course/course');
 const razorpayInstance = require('../../../config/razorpay');
 const UserAuth = require("../../models/Auth/Auth")
 const { apiResponse } = require('../../../utils/apiResponse');
 const UsermainCourse = require('../../models/UserCourse/usermainCourse');
-const NotificationService = require("../../../Notification/controller/notificationService")
+const NotificationService = require("../../../Notification/controller/notificationServiceController")
 
 // Request Internship Letter and Create Razorpay Order
 const requestInternshipLetter = async (req, res) => {

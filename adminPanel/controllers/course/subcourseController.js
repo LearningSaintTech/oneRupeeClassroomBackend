@@ -1,6 +1,6 @@
-const Subcourse = require('../../../course/models/subcourse');
-const Course = require('../../../course/models/course');
-const Lesson = require("../../../course/models/lesson");
+const Subcourse = require('../../models/course/subcourse');
+const Course = require('../../models/course/course');
+const Lesson = require("../../models/course/lesson");
 const { uploadImage, deleteImage } = require('../../../utils/s3Functions');
 const { apiResponse } = require("../../../utils/apiResponse");
 const mongoose = require('mongoose');
