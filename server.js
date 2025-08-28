@@ -33,6 +33,7 @@ const cron = require('node-cron');
 const Lesson = require('./course/models/lesson');
 const UserCourse = require('./userPanel/models/UserCourse/userCourse');
 const notificationRoutes = require("./Notification/routes/notification");
+const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
 
 require('dotenv').config();
 
@@ -195,7 +196,7 @@ app.get('/', (req, res) => {
 });
 
 // User Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes,verifyemailRoutes);
 app.use("/api/user/profile", profileRoutes);
 app.use("/api/user/course", userSideCourseRoutes, userCourseRoutes);
 app.use('/api/user/favorite', favouriteCourseRoutes);
