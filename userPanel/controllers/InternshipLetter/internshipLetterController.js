@@ -53,15 +53,21 @@ const requestInternshipLetter = async (req, res) => {
                 statusCode: 403,
             });
         }
-
-        // Check if internship letter request already exists
         const existingRequest = await InternshipLetter.findOne({ userId, courseId });
         if (existingRequest) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Internship letter request already exists',
-                statusCode: 400,
-            });
+            console.log('requestInternshipLetter: Existing internship letter request found:', { internshipLetterId: existingRequest._id, paymentStatus: existingRequest.paymentStatus });
+            // Check paymentStatus
+            if (existingRequest.paymentStatus === true) {
+                console.log('requestInternshipLetter: Payment already completed for internship letter:', { internshipLetterId: existingRequest._id });
+                return apiResponse(res, {
+                    success: false,
+                    message: 'Payment already completed for this internship letter request',
+                    statusCode: 400,
+                });
+            }
+            console.log('requestInternshipLetter: Payment not completed, allowing new order creation');
+        } else {
+            console.log('requestInternshipLetter: No existing internship letter request found');
         }
 
 
@@ -172,8 +178,8 @@ const updatePaymentStatus = async (req, res) => {
                 internshipLetterId: internshipLetter._id,
                 courseId: internshipLetter.courseId,
                 userId: internshipLetter.userId,
-                Status:internshipLetter.uploadStatus,
-                PaymentStatus:internshipLetter.paymentStatus
+                Status: internshipLetter.uploadStatus,
+                PaymentStatus: internshipLetter.paymentStatus
             },
             createdAt: new Date(),
         };

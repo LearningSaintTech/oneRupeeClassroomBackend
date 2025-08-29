@@ -7,6 +7,7 @@ const Notification = require('../../../Notification/model/notification');
 const Rating = require('../../models/Rating/rating');
 const FCMToken = require('../../../Notification/model/fcmToken');
 const Favourite = require('../../models/Favourite/favouriteCourse');
+const {uploadImage} = require('../../../utils/s3Functions');
 const { deleteImage } = require('../../../utils/s3Functions');
 const { apiResponse } = require('../../../utils/apiResponse');
 const mongoose = require('mongoose');

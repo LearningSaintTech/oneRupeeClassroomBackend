@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const User = require('../../models/Auth/Auth');
 const OTP = require('../../models/OTP/otp');
-const {apiResponse} = require("../../../utils/apiResponse")
+const { apiResponse } = require("../../../utils/apiResponse")
 
 
 // Configure Nodemailer transporter (e.g., Gmail SMTP)
@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-console.log("dataa",process.env.EMAIL_USER, process.env.EMAIL_PASS)
+console.log("dataa", process.env.EMAIL_USER, process.env.EMAIL_PASS)
 
 // Generate a 6-digit OTP
 const generateOTP = () => {
@@ -23,7 +23,7 @@ const generateOTP = () => {
 // Send OTP to email
 exports.sendOTPEmail = async (req, res) => {
     try {
-        const {email} = req.body;
+        const { email } = req.body;
         // Get user ID from middleware
         const userId = req.userId;
         if (!userId) {
@@ -33,6 +33,26 @@ exports.sendOTPEmail = async (req, res) => {
                 statusCode: 401,
             });
         }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return apiResponse(res, {
+                success: false,
+                message: 'User not found',
+                statusCode: 401,
+            });
+        }
+
+
+        // Check if email is already verified
+        if (user.isEmailVerified) {
+            return apiResponse(res, {
+                success: true,
+                message: 'User already verified',
+                statusCode: 200,
+            });
+        }
+
 
 
         // Check if email exists
@@ -67,7 +87,7 @@ exports.sendOTPEmail = async (req, res) => {
         return apiResponse(res, {
             success: true,
             message: 'OTP sent to email',
-            data:otp,
+            data: otp,
             statusCode: 200
         });
     } catch (error) {
@@ -96,9 +116,18 @@ exports.verifyOTP = async (req, res) => {
 
         // Find user by ID
         const user = await User.findById(userId);
+        console.log("userData", user)
 
-           const { email,otp } = req.body;
-           console.log("data",email,otp)
+        if (!user) {
+            return apiResponse(res, {
+                success: false,
+                message: 'User not found',
+                statusCode: 401,
+            });
+        }
+
+        const { email, otp } = req.body;
+        console.log("data", email, otp)
 
         // Check if email exists
         if (!email && !otp) {
@@ -132,6 +161,7 @@ exports.verifyOTP = async (req, res) => {
 
         // Update isEmailVerified
         user.isEmailVerified = true;
+        console.log(user.isEmailVerified)
         await user.save();
 
         // Delete OTP record after successful verification
