@@ -17,7 +17,7 @@ console.log("dataa", process.env.EMAIL_USER, process.env.EMAIL_PASS)
 
 // Generate a 6-digit OTP
 const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
 // Send OTP to email
