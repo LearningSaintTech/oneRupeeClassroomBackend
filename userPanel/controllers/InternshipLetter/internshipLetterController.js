@@ -7,12 +7,14 @@ const UserAuth = require("../../models/Auth/Auth")
 const { apiResponse } = require('../../../utils/apiResponse');
 const UsermainCourse = require('../../models/UserCourse/usermainCourse');
 const NotificationService = require("../../../Notification/controller/notificationServiceController")
+const { emitRequestInternshipLetter } = require('../../../socket/emitters');
 
 // Request Internship Letter and Create Razorpay Order
 const requestInternshipLetter = async (req, res) => {
     try {
         const { courseId } = req.body;
         const userId = req.userId
+        const io = req.app.get('io');
 
         // Validate courseId
         if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -70,7 +72,6 @@ const requestInternshipLetter = async (req, res) => {
             console.log('requestInternshipLetter: No existing internship letter request found');
         }
 
-
         // Create Razorpay order with a shorter receipt
         const receipt = `r_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
         const orderOptions = {
@@ -93,6 +94,20 @@ const requestInternshipLetter = async (req, res) => {
         });
 
         await internshipLetter.save();
+
+        // Emit request_internship_letter event
+        if (io) {
+            console.log('requestInternshipLetter: Emitting request_internship_letter event to user:', userId);
+            emitRequestInternshipLetter(io, userId, {
+                internshipLetterId: internshipLetter._id,
+                courseId,
+                userId,
+                razorpayOrderId: razorpayOrder.id,
+                createdAt: new Date(),
+            });
+        } else {
+            console.log('requestInternshipLetter: Socket.IO instance not found');
+        }
 
         return apiResponse(res, {
             success: true,

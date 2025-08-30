@@ -6,12 +6,14 @@ const { uploadImage } = require('../../../utils/s3Functions');
 const path = require('path');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const Admin = require('../../models/Auth/auth');
+const { emitUploadInternshipLetter } = require('../../../socket/emitters');
 
 // Upload Internship Letter and Update Status
 exports.uploadInternshipLetter = async (req, res) => {
   try {
     const { internshipLetterId } = req.body;
-    const adminId = req.userId; // Assuming admin ID is available from authentication middleware
+    const adminId = req.userId;
+    const io = req.app.get('io');
     console.log('🔔 [uploadInternshipLetter] Request received:', {
       internshipLetterId,
       adminId,
@@ -100,7 +102,7 @@ exports.uploadInternshipLetter = async (req, res) => {
     });
 
     // Fetch course details for notification
-    let courseTitle = internshipLetter.courseId.toString(); // Fallback to courseId
+    let courseTitle = internshipLetter.courseId.toString();
     try {
       const course = await Course.findById(internshipLetter.courseId).select('title');
       if (course) {
@@ -118,15 +120,16 @@ exports.uploadInternshipLetter = async (req, res) => {
     try {
       const notificationData = {
         recipientId: internshipLetter.userId,
-        senderId: adminId, // Use admin's ID as senderId
+        senderId: adminId,
         title: 'Internship Letter Ready for Download',
-        body: `Your internship letter for the course  has been uploaded and is ready for download.`,
+        body: `Your internship letter for the course ${courseTitle} has been uploaded and is ready for download.`,
         type: 'internship_letter_uploaded',
         data: {
           internshipLetterId: internshipLetter._id,
           courseId: internshipLetter.courseId,
           userId: internshipLetter.userId,
         },
+        createdAt: new Date(),
       };
 
       await NotificationService.createAndSendNotification(notificationData);
@@ -137,16 +140,15 @@ exports.uploadInternshipLetter = async (req, res) => {
         courseTitle,
       });
 
-      // Optional: Emit real-time Socket.IO event to user
-      const io = req.app.get('io');
-      io.to(internshipLetter.userId.toString()).emit('internship_letter_notification', notificationData);
-      console.log('🔔 [uploadInternshipLetter] Socket.IO event emitted to user:', {
-        userId: internshipLetter.userId,
-        courseTitle,
-      });
+      // Emit upload_internship_letter event
+      if (io) {
+        console.log('uploadInternshipLetter: Emitting upload_internship_letter event to user:', internshipLetter.userId);
+        emitUploadInternshipLetter(io, internshipLetter.userId, notificationData);
+      } else {
+        console.log('uploadInternshipLetter: Socket.IO instance not found');
+      }
     } catch (notificationError) {
       console.error('🔔 [uploadInternshipLetter] Failed to send user notification:', notificationError);
-      // Do not fail the request if notification fails
     }
 
     return apiResponse(res, {

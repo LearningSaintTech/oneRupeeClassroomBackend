@@ -7,6 +7,7 @@ const { apiResponse } = require('../../../utils/apiResponse');
 const razorpayInstance = require('../../../config/razorpay');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const crypto = require("crypto");
+const { emitBuyCourse } = require('../../../socket/emitters');
 
 // Buy course API
 exports.buyCourse = async (req, res) => {
@@ -172,12 +173,12 @@ exports.buyCourse = async (req, res) => {
   }
 };
 
-
 // Verify payment and update status
 exports.verifyPayment = async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId } = req.body;
     const userId = req.userId;
+    const io = req.app.get('io');
 
     console.log('verifyPayment: Starting with inputs:', { userId, razorpayOrderId, razorpayPaymentId, subcourseId });
 
@@ -298,6 +299,7 @@ exports.verifyPayment = async (req, res) => {
         courseId: subcourse.courseId,
         subcourseId: subcourse._id,
       },
+      createdAt: new Date(),
     };
     console.log('verifyPayment: Preparing notification:', notificationData);
 
@@ -305,16 +307,17 @@ exports.verifyPayment = async (req, res) => {
     const notification = await NotificationService.createAndSendNotification(notificationData);
     console.log('verifyPayment: Notification created and sent:', { notificationId: notification._id });
 
-    // Emit real-time notification via WebSocket (Socket.IO)
-    const io = req.app.get('io');
+    // Emit buy_course event
     if (io) {
-      console.log('verifyPayment: Emitting WebSocket notification to user:', userId);
-      io.to(userId.toString()).emit('new_notification', {
+      console.log('verifyPayment: Emitting buy_course event to user:', userId);
+      emitBuyCourse(io, userId, {
         id: notification._id,
         title: notificationData.title,
         body: notificationData.body,
         type: notificationData.type,
         createdAt: notification.createdAt,
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
       });
     } else {
       console.log('verifyPayment: Socket.IO instance not found');

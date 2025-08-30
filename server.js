@@ -29,19 +29,15 @@ const getAllRatings = require("./adminPanel/routes/ratingsRoutes");
 const InternshipLetter = require("./userPanel/routes/internshipLetterRoutes");
 const uploadInternshipLetter = require("./adminPanel/routes/uploadInternshipLetterRoutes");
 const NotificationService = require('./Notification/controller/notificationServiceController');
-const cron = require('node-cron');
-const Lesson = require('./adminPanel/models/course/lesson');
-const UserCourse = require('./userPanel/models/UserCourse/userCourse');
 const notificationRoutes = require("./Notification/routes/notificationRoutes");
 const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
+const startLessonReminder = require('./cron/lessonReminders');
+const eventNames = require('./socket/eventNames');
 
 require('dotenv').config();
 
 // Set timezone to IST
 process.env.TZ = 'Asia/Kolkata';
-
-// Default system sender ID
-const SYSTEM_SENDER_ID = new mongoose.Types.ObjectId();
 
 const app = express();
 const server = http.createServer(app);
@@ -56,7 +52,7 @@ app.use(express.urlencoded({ extended: true }));
 // Connect to MongoDB
 connectDB();
 
-// Initialize Socket.IO with WebSocket support
+// Initialize Socket.IO
 const io = new Server(server, {
   cors: {
     origin: 'http://localhost:5173',
@@ -66,16 +62,13 @@ const io = new Server(server, {
   transports: ['websocket', 'polling'],
 });
 
-// Make io available to routes
-app.set('io', io);
-
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`🔗 [Socket Connected] Socket ID: ${socket.id}, Timestamp: ${new Date().toISOString()}`);
   
-  socket.on('join', (userId) => {
+  socket.on(eventNames.JOIN, (userId) => {
     console.log(`📌 [Join Event] User ID: ${userId} joined room with Socket ID: ${socket.id}, Timestamp: ${new Date().toISOString()}`);
-    socket.join(userId);
+    socket.join(userId.toString());
     console.log(`✅ [Room Joined] Current rooms for socket ${socket.id}:`, socket.rooms, `Timestamp: ${new Date().toISOString()}`);
   });
 
@@ -84,110 +77,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Schedule task to send lesson reminders every minute
-const startLessonReminder = async () => {
-  console.log(`⏰ [Cron Started] Lesson reminder cron job initiated, Timestamp: ${new Date().toISOString()}`);
-  cron.schedule('* * * * *', async () => {
-    try {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const currentTime = now.getTime();
-      console.log(`🔍 [Cron Run] Checking lessons for reminders, Current Time: ${now.toISOString()}`);
-
-      // Find lessons scheduled for today
-      const lessons = await Lesson.find({
-        date: {
-          $gte: today,
-          $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-        },
-      });
-      console.log(`📚 [Lessons Found] ${lessons.length} lessons scheduled for today`);
-
-      for (const lesson of lessons) {
-        const lessonDate = new Date(lesson.date);
-        if (lessonDate.getDate() !== today.getDate()) {
-          console.log(`⏭️ [Skipped Lesson] Lesson ${lesson.lessonName} not for today`);
-          continue;
-        }
-
-        const startTime = lesson.startTime;
-        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(startTime)) {
-          console.log(`⚠️ [Invalid Time] Lesson ${lesson.lessonName} has invalid startTime: ${startTime}`);
-          continue;
-        }
-
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const lessonStartTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHours, startMinutes).getTime();
-        const fifteenMinBefore = lessonStartTime - 15 * 60 * 1000;
-
-        const oneMinWindow = 60 * 1000; // 1-minute window for cron
-
-        let reminderType = null;
-        if (currentTime >= lessonStartTime && currentTime < lessonStartTime + oneMinWindow) {
-          reminderType = 'now';
-        } else if (currentTime >= fifteenMinBefore && currentTime < fifteenMinBefore + oneMinWindow) {
-          reminderType = '15 minutes before';
-        }
-
-        if (reminderType) {
-          console.log(`🔔 [Reminder Triggered] Lesson: ${lesson.lessonName}, Type: ${reminderType}, Lesson ID: ${lesson._id}`);
-          
-          // Find enrolled users
-          const enrolledUsers = await UserCourse.find({ subcourseId: lesson.subcourseId }).select('userId');
-          console.log(`👥 [Enrolled Users] Found ${enrolledUsers.length} users for lesson ${lesson.lessonName}`);
-          
-          if (enrolledUsers.length === 0) {
-            console.log(`⚠️ [No Users] No enrolled users for lesson ${lesson.lessonName}`);
-            continue;
-          }
-
-          const notificationData = {
-            recipientId: null, // Will be set for each user
-            senderId: SYSTEM_SENDER_ID,
-            title: `Lesson Update: ${lesson.lessonName}`,
-            body: `The lesson ${lesson.lessonName} is ${reminderType === 'now' ? 'starting now' : 'starting in few 15 mintues'}!`,
-            type: 'lesson_live',
-            data: {
-              lessonId: lesson._id,
-              subcourseId: lesson.subcourseId,
-            },
-            createdAt: new Date(),
-          };
-
-          for (const { userId } of enrolledUsers) {
-            notificationData.recipientId = userId;
-            console.log(`📨 [Sending Notification] To User ID: ${userId}, Lesson: ${lesson.lessonName}`);
-            io.to(userId.toString()).emit('lesson_notification', notificationData);
-            try {
-              await NotificationService.createAndSendNotification({
-                recipientId: userId,
-                senderId: SYSTEM_SENDER_ID,
-                title: notificationData.title,
-                body: notificationData.body,
-                type: notificationData.type,
-                data: {
-                  lessonId: lesson._id,
-                  subcourseId: lesson.subcourseId,
-                },
-              });
-              console.log(`✅ [Notification Sent] To User ID: ${userId}, Lesson: ${lesson.lessonName}`);
-            } catch (notificationError) {
-              console.error(`❌ [Notification Error] Failed to send to User ID: ${userId}, Error: ${notificationError.message}`);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`❌ [Cron Error] Lesson reminder check failed: ${error.message}, Timestamp: ${new Date().toISOString()}`);
-    }
-  });
-};
+// Make io available to routes
+app.set('io', io);
 
 // Start reminder after MongoDB connection
 mongoose.connection.once('open', () => {
   console.log(`✅ [MongoDB Connected] Starting lesson reminder cron job`);
-  startLessonReminder();
+  startLessonReminder(io);
 });
 
 // Routes
@@ -196,7 +92,7 @@ app.get('/', (req, res) => {
 });
 
 // User Routes
-app.use('/api/auth', authRoutes,verifyemailRoutes);
+app.use('/api/auth', authRoutes, verifyemailRoutes);
 app.use("/api/user/profile", profileRoutes);
 app.use("/api/user/course", userSideCourseRoutes, userCourseRoutes);
 app.use('/api/user/favorite', favouriteCourseRoutes);
