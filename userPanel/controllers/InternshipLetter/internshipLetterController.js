@@ -229,7 +229,7 @@ const updatePaymentStatus = async (req, res) => {
 const checkInternshipStatus = async (req, res) => {
     try {
         const userId = req.userId;
-        const { courseId } = req.params;
+        const { courseId } = req.params; // Extract courseId from URL params
 
         // Validate courseId
         if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -246,21 +246,27 @@ const checkInternshipStatus = async (req, res) => {
             courseId,
         });
 
-        // If no internship letter request exists, return false
+        // If no internship letter request exists, return false for isEnrolled and null for uploadStatus
         if (!internshipLetter) {
             return apiResponse(res, {
                 success: true,
                 message: 'No internship letter request found',
-                data: { isEnrolled: false },
+                data: { 
+                    isEnrolled: false,
+                    uploadStatus: null 
+                },
                 statusCode: 200,
             });
         }
 
-        // Return true if paymentStatus is true, false otherwise
+        // Return isEnrolled based on paymentStatus and include uploadStatus
         return apiResponse(res, {
             success: true,
             message: 'Internship status checked successfully',
-            data: { isEnrolled: internshipLetter.paymentStatus === true },
+            data: { 
+                isEnrolled: internshipLetter.paymentStatus === true,
+                uploadStatus: internshipLetter.uploadStatus 
+            },
             statusCode: 200,
         });
 
@@ -273,6 +279,7 @@ const checkInternshipStatus = async (req, res) => {
         });
     }
 };
+
 
 
 module.exports = {
