@@ -14,7 +14,6 @@ const requestInternshipLetter = async (req, res) => {
     try {
         const { courseId } = req.body;
         const userId = req.userId
-        const io = req.app.get('io');
 
         // Validate courseId
         if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -95,20 +94,6 @@ const requestInternshipLetter = async (req, res) => {
 
         await internshipLetter.save();
 
-        // Emit request_internship_letter event
-        if (io) {
-            console.log('requestInternshipLetter: Emitting request_internship_letter event to user:', userId);
-            emitRequestInternshipLetter(io, userId, {
-                internshipLetterId: internshipLetter._id,
-                courseId,
-                userId,
-                razorpayOrderId: razorpayOrder.id,
-                createdAt: new Date(),
-            });
-        } else {
-            console.log('requestInternshipLetter: Socket.IO instance not found');
-        }
-
         return apiResponse(res, {
             success: true,
             message: 'Internship letter request created successfully',
@@ -179,6 +164,25 @@ const updatePaymentStatus = async (req, res) => {
         internshipLetter.paymentDate = new Date();
 
         await internshipLetter.save();
+
+        // Emit request_internship_letter event
+        if (io) {
+            console.log('updatePaymentStatus: Emitting request_internship_letter event to user:', userId);
+            emitRequestInternshipLetter(io, userId, {
+                internshipLetterId: internshipLetter._id,
+                courseId: internshipLetter.courseId,
+                courseName: course.courseName,
+                userId: internshipLetter.userId,
+                userName: user.fullName,
+                status: internshipLetter.uploadStatus,
+                paymentStatus: internshipLetter.paymentStatus,
+                paymentDate: internshipLetter.paymentDate,
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            console.log('updatePaymentStatus: Socket.IO instance not found');
+        }
+
         // Fetch courseName and userName
         const course = await Course.findById(internshipLetter.courseId).select('courseName');
         const user = await UserAuth.findById(userId).select('fullName');
@@ -217,7 +221,61 @@ const updatePaymentStatus = async (req, res) => {
     }
 };
 
+
+
+//check internship-request status
+
+const checkInternshipStatus = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { courseId } = req.params;
+
+        // Validate courseId
+        if (!mongoose.Types.ObjectId.isValid(courseId)) {
+            return apiResponse(res, {
+                success: false,
+                message: 'Invalid course ID',
+                statusCode: 400,
+            });
+        }
+
+        // Check if internship letter request exists for the user and course
+        const internshipLetter = await InternshipLetter.findOne({
+            userId,
+            courseId,
+        });
+
+        // If no internship letter request exists, return false
+        if (!internshipLetter) {
+            return apiResponse(res, {
+                success: true,
+                message: 'No internship letter request found',
+                data: { isEnrolled: false },
+                statusCode: 200,
+            });
+        }
+
+        // Return true if paymentStatus is true, false otherwise
+        return apiResponse(res, {
+            success: true,
+            message: 'Internship status checked successfully',
+            data: { isEnrolled: internshipLetter.paymentStatus === true },
+            statusCode: 200,
+        });
+
+    } catch (error) {
+        console.error('Error checking internship status:', error.message);
+        return apiResponse(res, {
+            success: false,
+            message: 'Server error',
+            statusCode: 500,
+        });
+    }
+};
+
+
 module.exports = {
     requestInternshipLetter,
     updatePaymentStatus,
+    checkInternshipStatus
 };
