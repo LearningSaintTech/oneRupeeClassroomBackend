@@ -10,6 +10,7 @@ const userLesson = require("../../models/UserCourse/userLesson");
 const Promo = require("../../../Promo/models/promo");
 const subcourse = require('../../../adminPanel/models/course/subcourse');
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
+const InternshipLetter = require("../../../adminPanel/models/InternshipLetter/internshipLetter")
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -897,7 +898,8 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
 exports.getCourseNameAndDesc = async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log(`Fetching course name and description for courseId: ${courseId}`);
+    const userId  = req.userId; // Assuming userId is passed in the request body
+    console.log(`Fetching course name, description, and upload status for courseId: ${courseId}, userId: ${userId}`);
 
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -905,6 +907,16 @@ exports.getCourseNameAndDesc = async (req, res) => {
       return apiResponse(res, {
         success: false,
         message: 'Invalid course ID',
+        statusCode: 400,
+      });
+    }
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Invalid user ID: ${userId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid user ID',
         statusCode: 400,
       });
     }
@@ -925,17 +937,30 @@ exports.getCourseNameAndDesc = async (req, res) => {
       });
     }
 
+    // Fetch the upload status from internshipLetter for the user and course
+    const internshipLetter = await InternshipLetter.findOne(
+      { userId, courseId },
+      'uploadStatus'
+    );
+
+    // Prepare the response data
+    const responseData = {
+      courseName: course.courseName,
+      certificateDescription: course.certificateDescription,
+      uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload' // Default to 'upload' if no record found
+    };
+
     return apiResponse(res, {
       success: true,
-      message: 'Course retrieved successfully',
-      data: course,
+      message: 'Course and upload status retrieved successfully',
+      data: responseData,
       statusCode: 200,
     });
   } catch (error) {
-    console.error('Error fetching course:', error);
+    console.error('Error fetching course and upload status:', error);
     return apiResponse(res, {
       success: false,
-      message: `Failed to fetch course: ${error.message}`,
+      message: `Failed to fetch course and upload status: ${error.message}`,
       statusCode: 500,
     });
   }
