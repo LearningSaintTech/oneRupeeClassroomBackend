@@ -112,7 +112,7 @@ const requestInternshipLetter = async (req, res) => {
         return apiResponse(res, {
             success: true,
             message: 'Internship letter request created successfully',
-            data: { internshipLetter, razorpayOrder },
+            data: { internshipLetter, razorpayOrder},
             statusCode: 201,
         });
     } catch (error) {

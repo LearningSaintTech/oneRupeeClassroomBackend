@@ -156,7 +156,7 @@ exports.buyCourse = async (req, res) => {
         orderId: order.id,
         amount: order.amount,
         currency: order.currency,
-        key: razorpayInstance.key_id,
+        // key: razorpayInstance.key_id,
         userCourse,
         usermainCourse,
       },
