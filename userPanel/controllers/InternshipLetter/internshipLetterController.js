@@ -97,7 +97,7 @@ const requestInternshipLetter = async (req, res) => {
         return apiResponse(res, {
             success: true,
             message: 'Internship letter request created successfully',
-            data: { internshipLetter, razorpayOrder},
+            data: { internshipLetter, razorpayOrder },
             statusCode: 201,
         });
     } catch (error) {
@@ -165,24 +165,6 @@ const updatePaymentStatus = async (req, res) => {
 
         await internshipLetter.save();
 
-        // Emit request_internship_letter event
-        if (io) {
-            console.log('updatePaymentStatus: Emitting request_internship_letter event to user:', userId);
-            emitRequestInternshipLetter(io, userId, {
-                internshipLetterId: internshipLetter._id,
-                courseId: internshipLetter.courseId,
-                courseName: course.courseName,
-                userId: internshipLetter.userId,
-                userName: user.fullName,
-                status: internshipLetter.uploadStatus,
-                paymentStatus: internshipLetter.paymentStatus,
-                paymentDate: internshipLetter.paymentDate,
-                createdAt: new Date().toISOString()
-            });
-        } else {
-            console.log('updatePaymentStatus: Socket.IO instance not found');
-        }
-
         // Fetch courseName and userName
         const course = await Course.findById(internshipLetter.courseId).select('courseName');
         const user = await UserAuth.findById(userId).select('fullName');
@@ -204,6 +186,25 @@ const updatePaymentStatus = async (req, res) => {
         };
 
         await NotificationService.sendAdminNotification(notificationData);
+
+        // Emit request_internship_letter event
+        if (io) {
+            console.log('updatePaymentStatus: Emitting request_internship_letter event to user:', userId);
+            emitRequestInternshipLetter(io, userId, {
+                internshipLetterId: internshipLetter._id,
+                courseId: internshipLetter.courseId,
+                courseName: course.courseName,
+                userId: internshipLetter.userId,
+                userName: user.fullName,
+                status: internshipLetter.uploadStatus,
+                paymentStatus: internshipLetter.paymentStatus,
+                paymentDate: internshipLetter.paymentDate,
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            console.log('updatePaymentStatus: Socket.IO instance not found');
+        }
+
 
         return apiResponse(res, {
             success: true,
