@@ -11,10 +11,10 @@ exports.saveFCMToken = async (req, res) => {
   });
 
   try {
-    const { fcmToken,deviceId } = req.body;
+    const { fcmToken, deviceId } = req.body;
     const userId = req.userId; // From authMiddleware
 
-    if (!fcmToken ||  !deviceId) {
+    if (!fcmToken || !deviceId) {
       console.log('🔔 [saveFCMToken] Missing fcmToken or deviceId');
       return apiResponse(res, {
         success: false,
@@ -23,22 +23,36 @@ exports.saveFCMToken = async (req, res) => {
       });
     }
 
+    // Find or create user document with tokens array
     const result = await FCMToken.findOneAndUpdate(
-      { fcmToken },
-      { userId, deviceId,isActive: true, lastSeen: new Date() },
-      { upsert: true, new: true }
+      { userId },
+      { 
+        $addToSet: { 
+          tokens: { 
+            fcmToken, 
+            deviceId, 
+            isActive: true, 
+            lastSeen: new Date() 
+          }
+        }
+      },
+      { 
+        upsert: true, 
+        new: true 
+      }
     );
 
     console.log('🔔 [saveFCMToken] FCM token saved successfully:', {
       userId,
-      isActive: result.isActive,
-      lastSeen: result.lastSeen,
+      tokenCount: result.tokens.length,
+      lastAddedToken: fcmToken,
     });
 
     return apiResponse(res, {
       success: true,
       message: 'FCM token saved successfully',
       statusCode: 200,
+      data: { tokenCount: result.tokens.length }
     });
   } catch (error) {
     console.error('🔔 [saveFCMToken] Error:', error);

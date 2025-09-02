@@ -7,7 +7,7 @@ const fcmTokenSchema = new mongoose.Schema({
     index: true
   },
   fcmToken: {
-    type: String,
+    type: [String],
     required: true,
     unique: true
   },
