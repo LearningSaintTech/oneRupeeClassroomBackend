@@ -28,6 +28,15 @@ const firebaseConfigs = {
     auth_provider_x509_cert_url: process.env.FIREBASE_APP_AUTH_PROVIDER_X509_CERT_URL,
     client_x509_cert_url: process.env.FIREBASE_APP_CLIENT_X509_CERT_URL,
     universe_domain: process.env.FIREBASE_APP_UNIVERSE_DOMAIN,
+  },
+  ios: { // ✅ iOS Config
+    apiKey: process.env.FIREBASE_IOS_API_KEY,
+    gcmSenderId: process.env.FIREBASE_IOS_GCM_SENDER_ID,
+    plistVersion: process.env.FIREBASE_IOS_PLIST_VERSION,
+    bundleId: process.env.FIREBASE_IOS_BUNDLE_ID,
+    projectId: process.env.FIREBASE_IOS_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_IOS_STORAGE_BUCKET,
+    googleAppId: process.env.FIREBASE_IOS_GOOGLE_APP_ID,
   }
 };
 
@@ -137,8 +146,15 @@ console.log('🔔 [Firebase Config] Configuration check:', {
     hasPrivateKey: !!process.env.FIREBASE_APP_PRIVATE_KEY,
     hasClientEmail: !!process.env.FIREBASE_APP_CLIENT_EMAIL,
     projectId: process.env.FIREBASE_APP_PROJECT_ID,
+  },
+  ios: {
+    hasApiKey: !!process.env.FIREBASE_IOS_API_KEY,
+    hasProjectId: !!process.env.FIREBASE_IOS_PROJECT_ID,
+    bundleId: process.env.FIREBASE_IOS_BUNDLE_ID,
+    googleAppId: process.env.FIREBASE_IOS_GOOGLE_APP_ID,
   }
 });
+
 
 module.exports = {
   admin,
