@@ -1,34 +1,8 @@
-const admin = require('firebase-admin');
 const Notification = require('../model/notification');
 const FCMToken = require('../model/fcmToken');
 const User = require('../../userPanel/models/Auth/Auth'); 
 const Admin = require("../../adminPanel/models/Auth/auth");
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  const serviceAccount = {
-    type: process.env.FIREBASE_TYPE,
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    client_id: process.env.FIREBASE_CLIENT_ID,
-    auth_uri: process.env.FIREBASE_AUTH_URI,
-    token_uri: process.env.FIREBASE_TOKEN_URI,
-    auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-    client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-    universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
-  };
-
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    console.log('🔔 [NotificationService] Firebase Admin initialized successfully');
-  } catch (error) {
-    console.error('🔔 [NotificationService] Firebase Admin initialization error:', error);
-  }
-}
+const { sendNotificationToToken } = require('../../config/firebase');
 
 class NotificationService {
   // Create notification and send push
@@ -75,7 +49,7 @@ class NotificationService {
       const { recipientId, title, body, type, data } = notificationData;
 
       // Get FCM token
-      console.log('🔔 [sendPushNotification] Looking for FCM token...');
+      console.log('🔔 [sendPushNotification] Looking for FCM token for user:', recipientId);
       const fcmToken = await FCMToken.findOne({
         userId: recipientId,
         isActive: true,
@@ -85,6 +59,9 @@ class NotificationService {
         console.log('🔔 [sendPushNotification] No FCM token found for user:', {
           recipientId,
         });
+        console.log('🔔 [sendPushNotification] Checking all FCM tokens in database...');
+        const allTokens = await FCMToken.find({}).select('userId isActive');
+        console.log('🔔 [sendPushNotification] All FCM tokens in database:', allTokens);
         return;
       }
 
@@ -131,7 +108,7 @@ class NotificationService {
         data: message.data,
       });
 
-      const response = await admin.messaging().send(message);
+      const response = await sendNotificationToToken(fcmToken.fcmToken, message);
       console.log('🔔 [sendPushNotification] FCM response:', response);
 
       // Update notification as sent
@@ -258,6 +235,11 @@ class NotificationService {
   try {
     // Find admin users from the admin collection
     const admins = await Admin.find({ role: 'admin' }).select('_id');
+    console.log('🔔 [sendAdminNotification] Found admins:', {
+      count: admins.length,
+      adminIds: admins.map(a => a._id)
+    });
+    
     if (!admins.length) {
       console.log('🔔 [sendAdminNotification] No admins found');
       return;
@@ -269,8 +251,18 @@ class NotificationService {
       recipientId: admin._id,
     }));
 
+    console.log('🔔 [sendAdminNotification] Created notifications for admins:', {
+      count: notifications.length,
+      notifications: notifications.map(n => ({
+        recipientId: n.recipientId,
+        title: n.title,
+        type: n.type
+      }))
+    });
+
     // Save and send notifications
     for (const notification of notifications) {
+      console.log('🔔 [sendAdminNotification] Processing notification for admin:', notification.recipientId);
       await this.createAndSendNotification(notification);
     }
 

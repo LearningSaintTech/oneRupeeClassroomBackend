@@ -5,6 +5,10 @@ const emitLiveLesson = (io, userId, data) => {
 };
 
 const emitRequestInternshipLetter = (io, userId, data) => {
+  console.log("io",io)
+  console.log("userID",userId)
+  console.log("data",data)
+  console.log("eventNames.REQUEST_INTERNSHIP_LETTER",eventNames.REQUEST_INTERNSHIP_LETTER)
   io.to(userId.toString()).emit(eventNames.REQUEST_INTERNSHIP_LETTER, data);
 };
 

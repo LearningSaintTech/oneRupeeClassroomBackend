@@ -79,7 +79,7 @@ exports.login = async (req, res) => {
 };
 
 exports.verifyOTP = async (req, res) => {
-    const { mobileNumber, otp } = req.body;
+    const { mobileNumber, otp, fcmToken, deviceId } = req.body;
 
     if (!mobileNumber || !otp) {
         return apiResponse(res, {
@@ -130,6 +130,27 @@ exports.verifyOTP = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+
+        // Save FCM token if provided
+        if (fcmToken && deviceId) {
+            try {
+                console.log('🔔 [verifyOTP] Saving FCM token for admin:', user._id);
+                await FCMToken.findOneAndUpdate(
+                    { fcmToken },
+                    {
+                        userId: user._id,
+                        deviceId,
+                        isActive: true,
+                        lastSeen: new Date()
+                    },
+                    { upsert: true, new: true }
+                );
+                console.log('🔔 [verifyOTP] FCM token saved successfully');
+            } catch (fcmError) {
+                console.error('🔔 [verifyOTP] Error saving FCM token:', fcmError);
+            }
+        }
 
         return apiResponse(res, {
             message: 'Mobile Number verified',
