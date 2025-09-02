@@ -2,6 +2,7 @@ const admin = require('../../models/Auth/auth');
 const OTP = require('../../../userPanel/models/OTP/otp');
 const jwt = require('jsonwebtoken');
 const { apiResponse } = require('../../../utils/apiResponse');
+const FCMToken = require("../../../Notification/model/fcmToken");
 require('dotenv').config();
 
 const generateOTP = () => {
