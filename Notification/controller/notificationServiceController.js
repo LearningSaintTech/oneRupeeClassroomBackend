@@ -50,30 +50,40 @@ class NotificationService {
 
       // Get FCM token
       console.log('🔔 [sendPushNotification] Looking for FCM token for user:', recipientId);
-      const fcmToken = await FCMToken.findOne({
+      const fcmTokenDoc = await FCMToken.findOne({
         userId: recipientId,
-        isActive: true,
+        'tokens.isActive': true, // Ensure at least one token is active
       });
 
-      if (!fcmToken) {
-        console.log('🔔 [sendPushNotification] No FCM token found for user:', {
+      if (!fcmTokenDoc || !fcmTokenDoc.tokens.length) {
+        console.log('🔔 [sendPushNotification] No active FCM token found for user:', {
           recipientId,
         });
         console.log('🔔 [sendPushNotification] Checking all FCM tokens in database...');
-        const allTokens = await FCMToken.find({}).select('userId isActive');
+        const allTokens = await FCMToken.find({}).select('userId tokens.isActive');
         console.log('🔔 [sendPushNotification] All FCM tokens in database:', allTokens);
         return;
       }
 
+      // Get the first active token (you can modify this logic to handle multiple tokens)
+      const activeToken = fcmTokenDoc.tokens.find(token => token.isActive);
+      if (!activeToken) {
+        console.log('🔔 [sendPushNotification] No active token in tokens array:', {
+          recipientId,
+        });
+        return;
+      }
+
       console.log('🔔 [sendPushNotification] FCM token found:', {
-        userId: fcmToken.userId,
-        isActive: fcmToken.isActive,
-        lastSeen: fcmToken.lastSeen,
+        userId: fcmTokenDoc.userId,
+        fcmToken: `${activeToken.fcmToken.substring(0, 20)}...`,
+        isActive: activeToken.isActive,
+        lastSeen: activeToken.lastSeen,
       });
 
       // Send FCM message
       const message = {
-        token: fcmToken.fcmToken,
+        token: activeToken.fcmToken,
         notification: {
           title,
           body,
@@ -102,13 +112,13 @@ class NotificationService {
       };
 
       console.log('🔔 [sendPushNotification] Sending FCM message:', {
-        token: fcmToken.fcmToken ? `${fcmToken.fcmToken.substring(0, 20)}...` : null,
+        token: `${activeToken.fcmToken.substring(0, 20)}...`,
         title,
         body,
         data: message.data,
       });
 
-      const response = await sendNotificationToToken(fcmToken.fcmToken, message);
+      const response = await sendNotificationToToken(activeToken.fcmToken, message);
       console.log('🔔 [sendPushNotification] FCM response:', response);
 
       // Update notification as sent
@@ -225,54 +235,54 @@ class NotificationService {
   }
 
   // Send notification to admin
- static async sendAdminNotification(notificationData) {
-  console.log('🔔 [sendAdminNotification] Starting:', {
-    title: notificationData.title,
-    type: notificationData.type,
-    timestamp: new Date().toISOString(),
-  });
-
-  try {
-    // Find admin users from the admin collection
-    const admins = await Admin.find({ role: 'admin' }).select('_id');
-    console.log('🔔 [sendAdminNotification] Found admins:', {
-      count: admins.length,
-      adminIds: admins.map(a => a._id)
+  static async sendAdminNotification(notificationData) {
+    console.log('🔔 [sendAdminNotification] Starting:', {
+      title: notificationData.title,
+      type: notificationData.type,
+      timestamp: new Date().toISOString(),
     });
-    
-    if (!admins.length) {
-      console.log('🔔 [sendAdminNotification] No admins found');
-      return;
+
+    try {
+      // Find admin users from the admin collection
+      const admins = await Admin.find({ role: 'admin' }).select('_id');
+      console.log('🔔 [sendAdminNotification] Found admins:', {
+        count: admins.length,
+        adminIds: admins.map(a => a._id)
+      });
+      
+      if (!admins.length) {
+        console.log('🔔 [sendAdminNotification] No admins found');
+        return;
+      }
+
+      // Create notifications for all admins
+      const notifications = admins.map((admin) => ({
+        ...notificationData,
+        recipientId: admin._id,
+      }));
+
+      console.log('🔔 [sendAdminNotification] Created notifications for admins:', {
+        count: notifications.length,
+        notifications: notifications.map(n => ({
+          recipientId: n.recipientId,
+          title: n.title,
+          type: n.type
+        }))
+      });
+
+      // Save and send notifications
+      for (const notification of notifications) {
+        console.log('🔔 [sendAdminNotification] Processing notification for admin:', notification.recipientId);
+        await this.createAndSendNotification(notification);
+      }
+
+      console.log('🔔 [sendAdminNotification] Admin notifications sent:', {
+        count: notifications.length,
+      });
+    } catch (error) {
+      console.error('🔔 [sendAdminNotification] Error:', error);
     }
-
-    // Create notifications for all admins
-    const notifications = admins.map((admin) => ({
-      ...notificationData,
-      recipientId: admin._id,
-    }));
-
-    console.log('🔔 [sendAdminNotification] Created notifications for admins:', {
-      count: notifications.length,
-      notifications: notifications.map(n => ({
-        recipientId: n.recipientId,
-        title: n.title,
-        type: n.type
-      }))
-    });
-
-    // Save and send notifications
-    for (const notification of notifications) {
-      console.log('🔔 [sendAdminNotification] Processing notification for admin:', notification.recipientId);
-      await this.createAndSendNotification(notification);
-    }
-
-    console.log('🔔 [sendAdminNotification] Admin notifications sent:', {
-      count: notifications.length,
-    });
-  } catch (error) {
-    console.error('🔔 [sendAdminNotification] Error:', error);
   }
-}
 }
 
 module.exports = NotificationService;
