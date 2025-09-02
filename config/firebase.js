@@ -141,6 +141,7 @@ console.log('🔔 [Firebase Config] Configuration check:', {
 });
 
 module.exports = {
+  admin,
   firebaseApps,
   getFirebaseAppForToken,
   sendNotificationToToken,

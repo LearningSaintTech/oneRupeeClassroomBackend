@@ -2,7 +2,7 @@
 const OTP = require('../../models/OTP/otp');
 const jwt = require('jsonwebtoken');
 const { apiResponse } = require('../../../utils/apiResponse');
-const admin = require('../../../config/firebase');
+const {admin} = require('../../../config/firebase');
 require('dotenv').config();
 
 // Generate a 4-digit OTP
