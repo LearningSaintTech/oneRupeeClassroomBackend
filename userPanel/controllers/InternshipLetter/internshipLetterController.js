@@ -47,6 +47,7 @@ const requestInternshipLetter = async (req, res) => {
 
         // Check if user has completed the course
         const userCourse = await UsermainCourse.findOne({ userId, courseId });
+        console.log("internshipDaata",userCourse)
         if (!userCourse || userCourse.status !== 'Course Completed' || !userCourse.isCompleted) {
             return apiResponse(res, {
                 success: false,

@@ -80,93 +80,103 @@ exports.login = async (req, res) => {
 };
 
 exports.verifyOTP = async (req, res) => {
-    const { mobileNumber, otp, fcmToken, deviceId } = req.body;
+  const { mobileNumber, otp, fcmToken, deviceId } = req.body;
 
-    if (!mobileNumber || !otp) {
-        return apiResponse(res, {
-            success: false,
-            message: 'Mobile number and OTP are required',
-            statusCode: 400,
-        });
+  if (!mobileNumber || !otp) {
+    return apiResponse(res, {
+      success: false,
+      message: 'Mobile number and OTP are required',
+      statusCode: 400,
+    });
+  }
+
+  if (!validateMobile(mobileNumber)) {
+    return apiResponse(res, {
+      success: false,
+      message: 'Invalid mobile number',
+      statusCode: 400,
+    });
+  }
+
+  try {
+    const otpRecord = await OTP.findOne({ mobileNumber, otp }).sort({ createdAt: -1 });
+
+    if (!otpRecord || new Date() > otpRecord.expiresAt) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid or expired OTP',
+        statusCode: 400,
+      });
     }
 
-    if (!validateMobile(mobileNumber)) {
-        return apiResponse(res, {
-            success: false,
-            message: 'Invalid mobile number',
-            statusCode: 400,
-        });
+    const user = await admin.findOne({ mobileNumber });
+
+    if (!user) {
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 400,
+      });
     }
 
-    try {
-        const otpRecord = await OTP.findOne({ mobileNumber, otp }).sort({ createdAt: -1 });
+    if (!user.isNumberVerified) {
+      user.isNumberVerified = true;
+      await user.save();
+    }
 
-        if (!otpRecord || new Date() > otpRecord.expiresAt) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid or expired OTP',
-                statusCode: 400,
-            });
-        }
+    await OTP.deleteOne({ _id: otpRecord._id });
 
-        const user = await admin.findOne({ mobileNumber });
+    const token = jwt.sign(
+      { userId: user._id, mobileNumber: user.mobileNumber },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-        if (!user) {
-            return apiResponse(res, {
-                success: false,
-                message: 'User not found',
-                statusCode: 400,
-            });
-        }
-
-        if (!user.isNumberVerified) {
-            user.isNumberVerified = true;
-            await user.save();
-        }
-
-        await OTP.deleteOne({ _id: otpRecord._id });
-
-        const token = jwt.sign(
-            { userId: user._id, mobileNumber: user.mobileNumber },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-
-        // Save FCM token if provided
-        if (fcmToken && deviceId) {
-            try {
-                console.log('🔔 [verifyOTP] Saving FCM token for admin:', user._id);
-                await FCMToken.findOneAndUpdate(
-                    { fcmToken },
-                    {
-                        userId: user._id,
-                        deviceId,
-                        isActive: true,
-                        lastSeen: new Date()
-                    },
-                    { upsert: true, new: true }
-                );
-                console.log('🔔 [verifyOTP] FCM token saved successfully');
-            } catch (fcmError) {
-                console.error('🔔 [verifyOTP] Error saving FCM token:', fcmError);
+    // Save FCM token if provided
+    if (fcmToken && deviceId) {
+      try {
+        console.log('🔔 [verifyOTP] Saving FCM token for admin:', user._id);
+        const result = await FCMToken.findOneAndUpdate(
+          { userId: user._id }, // Query by userId
+          { 
+            $addToSet: { 
+              tokens: { 
+                fcmToken, 
+                deviceId, 
+                isActive: true, 
+                lastSeen: new Date() 
+              }
             }
-        }
-
-        return apiResponse(res, {
-            message: 'Mobile Number verified',
-            data: { token },
+          },
+          { 
+            upsert: true, 
+            new: true,
+            runValidators: true 
+          }
+        );
+        console.log('🔔 [verifyOTP] FCM token saved successfully:', {
+          userId: user._id,
+          tokenCount: result.tokens.length,
+          lastAddedToken: fcmToken,
         });
-    } catch (error) {
-        return apiResponse(res, {
-            success: false,
-            message: 'Server error',
-            data: { error: error.message },
-            statusCode: 500,
-        });
+      } catch (fcmError) {
+        console.error('🔔 [verifyOTP] Error saving FCM token:', fcmError);
+      }
     }
-};
 
+    return apiResponse(res, {
+      message: 'Mobile Number verified',
+      data: { token },
+    });
+  } catch (error) {
+    return apiResponse(res, {
+      success: false,
+      message: 'Server error',
+      data: { error: error.message },
+      statusCode: 500,
+    });
+  }
+};
 exports.resendOTP = async (req, res) => {
     const { mobileNumber } = req.body;
 

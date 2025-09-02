@@ -23,7 +23,7 @@ exports.saveFCMToken = async (req, res) => {
       });
     }
 
-    // Find or create user document with tokens array
+    // Find or create user document and add token to the tokens array
     const result = await FCMToken.findOneAndUpdate(
       { userId },
       { 
@@ -38,7 +38,8 @@ exports.saveFCMToken = async (req, res) => {
       },
       { 
         upsert: true, 
-        new: true 
+        new: true,
+        runValidators: true // Ensure validation is applied during upsert
       }
     );
 

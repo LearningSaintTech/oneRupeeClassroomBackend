@@ -6,23 +6,25 @@ const fcmTokenSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  fcmToken: {
-    type: [String],
-    required: true,
-    unique: true
-  },
-  deviceId: {
-    type: String,
-    required:true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  lastSeen: {
-    type: Date,
-    default: Date.now
-  }
+  tokens: [{
+    fcmToken: {
+      type: String,
+      required: true,
+      unique: true // Ensures no duplicate tokens across documents
+    },
+    deviceId: {
+      type: String,
+      required: true
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });
