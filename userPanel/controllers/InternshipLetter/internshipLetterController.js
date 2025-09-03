@@ -254,7 +254,8 @@ const checkInternshipStatus = async (req, res) => {
                 message: 'No internship letter request found',
                 data: {
                     isEnrolled: false,
-                    uploadStatus: null
+                    uploadStatus: null,
+                    internshipLetter:""
                 },
                 statusCode: 200,
             });
@@ -266,7 +267,8 @@ const checkInternshipStatus = async (req, res) => {
             message: 'Internship status checked successfully',
             data: {
                 isEnrolled: internshipLetter.paymentStatus === true,
-                uploadStatus: internshipLetter.uploadStatus
+                uploadStatus: internshipLetter.uploadStatus,
+                internshipLetter:internshipLetter.internshipLetter
             },
             statusCode: 200,
         });
