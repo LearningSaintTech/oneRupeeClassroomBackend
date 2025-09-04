@@ -7,6 +7,7 @@ const {
   markAllAsRead,
   getUnreadCount,
   removeFCMToken,
+  deleteNotification
 } = require('../controller/notificationController');
 const {verifyToken} = require('../../middlewares/authMiddleware');
 
@@ -17,5 +18,6 @@ router.patch('/read/:notificationId', verifyToken, markAsRead);
 router.patch('/read-all', verifyToken, markAllAsRead);
 router.get('/unread-count', verifyToken, getUnreadCount);
 router.delete('/remove-fcm-token', verifyToken, removeFCMToken);
+router.delete('/delete-notification/:notificationId', verifyToken, deleteNotification);
 
 module.exports = router;

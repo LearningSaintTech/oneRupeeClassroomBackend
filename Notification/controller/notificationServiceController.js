@@ -283,6 +283,32 @@ class NotificationService {
       console.error('🔔 [sendAdminNotification] Error:', error);
     }
   }
+
+  static async deleteNotification(notificationId, userId) {
+    console.log('🔔 [deleteNotification] Starting:', {
+      notificationId,
+      userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const result = await Notification.findOneAndDelete({
+        _id: notificationId,
+        recipientId: userId,
+      });
+
+      console.log('🔔 [deleteNotification] Result:', {
+        notificationFound: !!result,
+        notificationId: result?._id,
+        title: result?.title,
+      });
+
+      return result;
+    } catch (error) {
+      console.error('🔔 [deleteNotification] Error:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = NotificationService;

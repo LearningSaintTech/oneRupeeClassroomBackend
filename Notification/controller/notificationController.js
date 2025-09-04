@@ -275,3 +275,58 @@ exports.removeFCMToken = async (req, res) => {
     });
   }
 };
+
+
+
+
+// Delete a notification
+exports.deleteNotification = async (req, res) => {
+  console.log('🔔 [deleteNotification] Request received:', {
+    params: req.params,
+    userId: req.userId,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    const { notificationId } = req.params;
+    const userId = req.userId;
+
+    if (!notificationId) {
+      console.log('🔔 [deleteNotification] Missing notificationId');
+      return apiResponse(res, {
+        success: false,
+        message: 'Notification ID is required',
+        statusCode: 400,
+      });
+    }
+
+    const result = await NotificationService.deleteNotification(notificationId, userId);
+
+    if (!result) {
+      console.log('🔔 [deleteNotification] Notification not found or unauthorized');
+      return apiResponse(res, {
+        success: false,
+        message: 'Notification not found or unauthorized',
+        statusCode: 404,
+      });
+    }
+
+    console.log('🔔 [deleteNotification] Notification deleted successfully:', {
+      notificationId,
+      userId,
+    });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Notification deleted successfully',
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('🔔 [deleteNotification] Error:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to delete notification: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
