@@ -74,7 +74,7 @@ exports.buyCourse = async (req, res) => {
     }
 
     // Create Razorpay order with shortened receipt
-    const amount = 1; // Note: This seems hardcoded for testing; consider using subcourse.certificatePrice
+    const amount = subcourse.price; // Note: This seems hardcoded for testing; consider using subcourse.certificatePrice
     const currency = 'INR';
     const receipt = `rcpt_${userId.slice(-8)}_${subcourseId.slice(-8)}_${Date.now().toString().slice(-6)}`;
     console.log('buyCourse: Generating Razorpay order with:', { amount, currency, receipt });
