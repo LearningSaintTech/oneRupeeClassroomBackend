@@ -22,7 +22,7 @@ const generateOTP = () => {
 };
 
 // Send OTP to email
-exports.sendOTPEmail = async (req, res) => {
+exports.sendOTPEmail = async (req, res) => { 
     try {
         const { email } = req.body;
         // Get user ID from middleware

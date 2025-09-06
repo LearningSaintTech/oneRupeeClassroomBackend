@@ -75,7 +75,7 @@ const requestInternshipLetter = async (req, res) => {
         // Create Razorpay order with a shorter receipt
         const receipt = `r_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
         const orderOptions = {
-            amount: 1 * 100, // Convert to paise
+            amount: course.CourseInternshipPrice * 100,
             currency: 'INR',
             receipt: receipt,
         };
