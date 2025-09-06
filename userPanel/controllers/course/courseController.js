@@ -924,7 +924,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
     // Fetch the course with only courseName and courseDescription
     const course = await Course.findById(
       courseId,
-      'courseName certificateDescription'
+      'courseName certificateDescription CourseInternshipPrice'
     );
 
     // Handle case where course is not found
@@ -950,6 +950,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
       uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
       price:course.CourseInternshipPrice
     };
+    console.log("44",responseData)
 
     return apiResponse(res, {
       success: true,
