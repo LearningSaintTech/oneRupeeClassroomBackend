@@ -947,7 +947,8 @@ exports.getCourseNameAndDesc = async (req, res) => {
     const responseData = {
       courseName: course.courseName,
       certificateDescription: course.certificateDescription,
-      uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload' // Default to 'upload' if no record found
+      uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
+      price:course.CourseInternshipPrice
     };
 
     return apiResponse(res, {
