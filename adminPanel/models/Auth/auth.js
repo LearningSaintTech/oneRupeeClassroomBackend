@@ -8,7 +8,7 @@ const adminSchema = new mongoose.Schema({
         unique: true,
         validate: {
             validator: function (value) {
-                return value === '+917042456533'; // Validates only the fixed number
+                return value === '+911234567890'; // Validates only the fixed number
             },
             message: 'Invalid mobile number',
         },

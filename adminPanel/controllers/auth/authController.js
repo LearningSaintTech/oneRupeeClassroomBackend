@@ -1,22 +1,23 @@
-const admin = require('../../models/Auth/auth');
+const Admin = require('../../models/Auth/auth'); // Capitalized for convention
 const OTP = require('../../../userPanel/models/OTP/otp');
 const jwt = require('jsonwebtoken');
 const { apiResponse } = require('../../../utils/apiResponse');
-const FCMToken = require("../../../Notification/model/fcmToken");
+const FCMToken = require('../../../Notification/model/fcmToken');
 require('dotenv').config();
 
+// Hardcoded OTP for testing
 const generateOTP = () => {
-    return Math.floor(1000 + Math.random() * 9000).toString();
+    return '1234'; // Hardcoded OTP as requested
 };
 
 // Validate mobile number (only allows fixed number)
 const validateMobile = (mobileNumber) => {
-    return mobileNumber === '+917042456533';
+    return mobileNumber === '+911234567890';
 };
 
 // Function to create and save OTP
 const createOTP = async (mobileNumber) => {
-    const otp = generateOTP();
+    const otp = generateOTP(); // Will always return '1234'
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
 
     await OTP.deleteMany({ mobileNumber });
@@ -24,7 +25,7 @@ const createOTP = async (mobileNumber) => {
     const newOTP = new OTP({ mobileNumber, otp, expiresAt });
     await newOTP.save();
 
-    console.log(`Generated OTP for ${mobileNumber}: ${otp}`);
+    console.log(`Generated OTP for ${mobileNumber}: ${otp}`); // For testing
     return otp; // For testing; remove in production
 };
 
@@ -48,26 +49,18 @@ exports.login = async (req, res) => {
     }
 
     try {
-        let user = await admin.findOne({ mobileNumber });
+        let user = await Admin.findOne({ mobileNumber });
 
         if (!user) {
-            user = new admin({ mobileNumber });
+            user = new Admin({ mobileNumber });
             await user.save();
         }
 
-        if (!user.isNumberVerified) {
-            const otp = await createOTP(mobileNumber);
-            return apiResponse(res, {
-                message: 'OTP sent for login',
-                data: { otp },
-            });
-        }
-
-        const otp = await createOTP(mobileNumber);
+        const otp = await createOTP(mobileNumber); // OTP will be '1234'
 
         return apiResponse(res, {
             message: 'OTP sent for login',
-            data: { otp },
+            data: { otp }, // Returning OTP for testing
         });
     } catch (error) {
         return apiResponse(res, {
@@ -80,103 +73,104 @@ exports.login = async (req, res) => {
 };
 
 exports.verifyOTP = async (req, res) => {
-  const { mobileNumber, otp, fcmToken, deviceId } = req.body;
+    const { mobileNumber, otp, fcmToken, deviceId } = req.body;
 
-  if (!mobileNumber || !otp) {
-    return apiResponse(res, {
-      success: false,
-      message: 'Mobile number and OTP are required',
-      statusCode: 400,
-    });
-  }
-
-  if (!validateMobile(mobileNumber)) {
-    return apiResponse(res, {
-      success: false,
-      message: 'Invalid mobile number',
-      statusCode: 400,
-    });
-  }
-
-  try {
-    const otpRecord = await OTP.findOne({ mobileNumber, otp }).sort({ createdAt: -1 });
-
-    if (!otpRecord || new Date() > otpRecord.expiresAt) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Invalid or expired OTP',
-        statusCode: 400,
-      });
-    }
-
-    const user = await admin.findOne({ mobileNumber });
-
-    if (!user) {
-      return apiResponse(res, {
-        success: false,
-        message: 'User not found',
-        statusCode: 400,
-      });
-    }
-
-    if (!user.isNumberVerified) {
-      user.isNumberVerified = true;
-      await user.save();
-    }
-
-    await OTP.deleteOne({ _id: otpRecord._id });
-
-    const token = jwt.sign(
-      { userId: user._id, mobileNumber: user.mobileNumber },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // Save FCM token if provided
-    if (fcmToken && deviceId) {
-      try {
-        console.log('🔔 [verifyOTP] Saving FCM token for admin:', user._id);
-        const result = await FCMToken.findOneAndUpdate(
-          { userId: user._id }, // Query by userId
-          { 
-            $addToSet: { 
-              tokens: { 
-                fcmToken, 
-                deviceId, 
-                isActive: true, 
-                lastSeen: new Date() 
-              }
-            }
-          },
-          { 
-            upsert: true, 
-            new: true,
-            runValidators: true 
-          }
-        );
-        console.log('🔔 [verifyOTP] FCM token saved successfully:', {
-          userId: user._id,
-          tokenCount: result.tokens.length,
-          lastAddedToken: fcmToken,
+    if (!mobileNumber || !otp) {
+        return apiResponse(res, {
+            success: false,
+            message: 'Mobile number and OTP are required',
+            statusCode: 400,
         });
-      } catch (fcmError) {
-        console.error('🔔 [verifyOTP] Error saving FCM token:', fcmError);
-      }
     }
 
-    return apiResponse(res, {
-      message: 'Mobile Number verified',
-      data: { token },
-    });
-  } catch (error) {
-    return apiResponse(res, {
-      success: false,
-      message: 'Server error',
-      data: { error: error.message },
-      statusCode: 500,
-    });
-  }
+    if (!validateMobile(mobileNumber)) {
+        return apiResponse(res, {
+            success: false,
+            message: 'Invalid mobile number',
+            statusCode: 400,
+        });
+    }
+
+    try {
+        const otpRecord = await OTP.findOne({ mobileNumber, otp: otp.toString() }).sort({ createdAt: -1 });
+
+        if (!otpRecord || new Date() > otpRecord.expiresAt) {
+            return apiResponse(res, {
+                success: false,
+                message: 'Invalid or expired OTP',
+                statusCode: 400,
+            });
+        }
+
+        const user = await Admin.findOne({ mobileNumber });
+
+        if (!user) {
+            return apiResponse(res, {
+                success: false,
+                message: 'User not found',
+                statusCode: 400,
+            });
+        }
+
+        if (!user.isNumberVerified) {
+            user.isNumberVerified = true;
+            await user.save();
+        }
+
+        await OTP.deleteOne({ _id: otpRecord._id });
+
+        const token = jwt.sign(
+            { userId: user._id, mobileNumber: user.mobileNumber },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Save FCM token if provided
+        if (fcmToken && deviceId) {
+            try {
+                console.log('🔔 [verifyOTP] Saving FCM token for admin:', user._id);
+                const result = await FCMToken.findOneAndUpdate(
+                    { userId: user._id },
+                    {
+                        $addToSet: {
+                            tokens: {
+                                fcmToken,
+                                deviceId,
+                                isActive: true,
+                                lastSeen: new Date(),
+                            },
+                        },
+                    },
+                    {
+                        upsert: true,
+                        new: true,
+                        runValidators: true,
+                    }
+                );
+                console.log('🔔 [verifyOTP] FCM token saved successfully:', {
+                    userId: user._id,
+                    tokenCount: result.tokens.length,
+                    lastAddedToken: fcmToken,
+                });
+            } catch (fcmError) {
+                console.error('🔔 [verifyOTP] Error saving FCM token:', fcmError);
+            }
+        }
+
+        return apiResponse(res, {
+            message: 'Mobile Number verified',
+            data: { token },
+        });
+    } catch (error) {
+        return apiResponse(res, {
+            success: false,
+            message: 'Server error',
+            data: { error: error.message },
+            statusCode: 500,
+        });
+    }
 };
+
 exports.resendOTP = async (req, res) => {
     const { mobileNumber } = req.body;
 
@@ -197,7 +191,7 @@ exports.resendOTP = async (req, res) => {
     }
 
     try {
-        const user = await admin.findOne({ mobileNumber });
+        const user = await Admin.findOne({ mobileNumber });
 
         if (!user) {
             return apiResponse(res, {
@@ -207,11 +201,11 @@ exports.resendOTP = async (req, res) => {
             });
         }
 
-        const otp = await createOTP(mobileNumber);
+        const otp = await createOTP(mobileNumber); // OTP will be '1234'
 
         return apiResponse(res, {
             message: 'OTP resent',
-            data: { otp }
+            data: { otp }, // Returning OTP for testing
         });
     } catch (error) {
         return apiResponse(res, {
