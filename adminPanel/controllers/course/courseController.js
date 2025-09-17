@@ -9,7 +9,7 @@ const { apiResponse } = require("../../../utils/apiResponse");
 exports.createCourse = async (req, res) => {
   try {
     const adminId = req.userId;
-    const { courseName, certificateDescription ,CourseInternshipPrice} = req.body;
+    const { courseName, certificateDescription, CourseInternshipPrice, courseCertificatePrice } = req.body;
     const file = req.file;
 
     if (!courseName || !certificateDescription || !file) {
@@ -32,7 +32,8 @@ exports.createCourse = async (req, res) => {
       courseName,
       CoverImageUrl: coverImageUrl,
       certificateDescription,
-      CourseInternshipPrice
+      CourseInternshipPrice,
+      courseCertificatePrice
     });
 
     await course.save();
@@ -87,7 +88,7 @@ exports.getAllCourses = async (req, res) => {
 exports.updateCourse = async (req, res) => {
   try {
     const courseId = req.params.id;
-    const { courseName, certificateDescription ,CourseInternshipPrice} = req.body;
+    const { courseName, certificateDescription, CourseInternshipPrice, courseCertificatePrice } = req.body;
     const file = req.file;
 
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -118,8 +119,12 @@ exports.updateCourse = async (req, res) => {
       course.certificateDescription = certificateDescription;
     }
 
-    if(CourseInternshipPrice){
+    if (CourseInternshipPrice) {
       course.CourseInternshipPrice = CourseInternshipPrice;
+    }
+
+    if (courseCertificatePrice) {
+      course.courseCertificatePrice = courseCertificatePrice;
     }
 
     // Update cover image if new file is provided

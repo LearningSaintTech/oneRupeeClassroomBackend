@@ -16,7 +16,12 @@ const courseSchema = new mongoose.Schema({
     },
     CourseInternshipPrice: {
         type: Number,
-        default:0
+        default: 0
+
+    },
+    courseCertificatePrice: {
+        type: Number,
+        default: 0
 
     },
     certificateDescription: {
