@@ -11,6 +11,7 @@ const Promo = require("../../../Promo/models/promo");
 const subcourse = require('../../../adminPanel/models/course/subcourse');
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 const InternshipLetter = require("../../../adminPanel/models/InternshipLetter/internshipLetter")
+const CertificatePayment = require('../../models/certificates/certificate');
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -845,14 +846,17 @@ exports.progressBanner = async (req, res) => {
 
 
 
+// Get Subcourse Name and Certificate Description
 exports.getSubcourseNameAndCertDesc = async (req, res) => {
   try {
     const { subcourseId } = req.params;
-    console.log(`Fetching subcourse name and certificate description for subcourseId: ${subcourseId}`);
+    const userId = req.userId; // Assuming userId is set by auth middleware
+
+    console.log(`[DEBUG] Fetching subcourse name and certificate description for subcourseId: ${subcourseId}, userId: ${userId}`);
 
     // Validate subcourseId
     if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
-      console.log(`Invalid subcourse ID: ${subcourseId}`);
+      console.log(`[DEBUG] Invalid subcourse ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid subcourse ID',
@@ -860,15 +864,35 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       });
     }
 
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`[DEBUG] Invalid user ID: ${userId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid user ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if CertificatePayment model is valid
+    if (typeof CertificatePayment.findOne !== 'function') {
+      console.error('[DEBUG] CertificatePayment.findOne is not a function');
+      return apiResponse(res, {
+        success: false,
+        message: 'Internal server error: CertificatePayment model is invalid',
+        statusCode: 500,
+      });
+    }
+
     // Fetch the subcourse with only subcourseName and certificateDescription
     const subcourse = await Subcourse.findById(
       subcourseId,
-      'subcourseName certificateDescription'
+      'subcourseName certificateDescription certificatePrice'
     );
 
     // Handle case where subcourse is not found
     if (!subcourse) {
-      console.log(`Subcourse not found for ID: ${subcourseId}`);
+      console.log(`[DEBUG] Subcourse not found for ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
@@ -876,14 +900,26 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       });
     }
 
+    // Check payment status
+    const certificatePayment = await CertificatePayment.findOne({ userId, subcourseId, paymentStatus: true });
+    const isPaymentDone = !!certificatePayment; // true if payment exists and is completed, false otherwise
+
+    // Prepare response data
+    const responseData = {
+      subcourseName: subcourse.subcourseName,
+      certificateDescription: subcourse.certificateDescription,
+      certificatePrice: subcourse.certificatePrice,
+      isPaymentDone,
+    };
+
     return apiResponse(res, {
       success: true,
       message: 'Subcourse retrieved successfully',
-      data: subcourse,
+      data: responseData,
       statusCode: 200,
     });
   } catch (error) {
-    console.error('Error fetching subcourse:', error);
+    console.error('[DEBUG] Error fetching subcourse:', error);
     return apiResponse(res, {
       success: false,
       message: `Failed to fetch subcourse: ${error.message}`,
@@ -892,18 +928,17 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
   }
 };
 
-
-
-
+// Get Course Name, Description, and Upload Status
 exports.getCourseNameAndDesc = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId  = req.userId; // Assuming userId is passed in the request body
-    console.log(`Fetching course name, description, and upload status for courseId: ${courseId}, userId: ${userId}`);
+    const userId = req.userId; // Assuming userId is set by auth middleware
+
+    console.log(`[DEBUG] Fetching course name, description, and upload status for courseId: ${courseId}, userId: ${userId}`);
 
     // Validate courseId
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      console.log(`Invalid course ID: ${courseId}`);
+      console.log(`[DEBUG] Invalid course ID: ${courseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid course ID',
@@ -913,7 +948,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
 
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      console.log(`Invalid user ID: ${userId}`);
+      console.log(`[DEBUG] Invalid user ID: ${userId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid user ID',
@@ -921,7 +956,17 @@ exports.getCourseNameAndDesc = async (req, res) => {
       });
     }
 
-    // Fetch the course with only courseName and courseDescription
+    // Check if CertificatePayment model is valid
+    if (typeof CertificatePayment.findOne !== 'function') {
+      console.error('[DEBUG] CertificatePayment.findOne is not a function');
+      return apiResponse(res, {
+        success: false,
+        message: 'Internal server error: CertificatePayment model is invalid',
+        statusCode: 500,
+      });
+    }
+
+    // Fetch the course with only courseName, certificateDescription, and CourseInternshipPrice
     const course = await Course.findById(
       courseId,
       'courseName certificateDescription CourseInternshipPrice'
@@ -929,7 +974,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
 
     // Handle case where course is not found
     if (!course) {
-      console.log(`Course not found for ID: ${courseId}`);
+      console.log(`[DEBUG] Course not found for ID: ${courseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Course not found',
@@ -937,20 +982,26 @@ exports.getCourseNameAndDesc = async (req, res) => {
       });
     }
 
-    // Fetch the upload status from internshipLetter for the user and course
+    // Fetch the upload status from InternshipLetter for the user and course
     const internshipLetter = await InternshipLetter.findOne(
       { userId, courseId },
       'uploadStatus'
     );
+
+    // Check payment status
+    const certificatePayment = await CertificatePayment.findOne({ userId, courseId, paymentStatus: true });
+    const isPaymentDone = !!certificatePayment; // true if payment exists and is completed, false otherwise
 
     // Prepare the response data
     const responseData = {
       courseName: course.courseName,
       certificateDescription: course.certificateDescription,
       uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
-      price:course.CourseInternshipPrice
+      price: course.CourseInternshipPrice,
+      isPaymentDone,
     };
-    console.log("44",responseData)
+
+    console.log('[DEBUG] Response data:', responseData);
 
     return apiResponse(res, {
       success: true,
@@ -959,7 +1010,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
       statusCode: 200,
     });
   } catch (error) {
-    console.error('Error fetching course and upload status:', error);
+    console.error('[DEBUG] Error fetching course and upload status:', error);
     return apiResponse(res, {
       success: false,
       message: `Failed to fetch course and upload status: ${error.message}`,
