@@ -11,104 +11,135 @@ const { emitRequestInternshipLetter } = require('../../../socket/emitters');
 
 // Request Internship Letter and Create Razorpay Order
 const requestInternshipLetter = async (req, res) => {
-    try {
-        const { courseId } = req.body;
-        const userId = req.userId
+  try {
+    const { courseId } = req.body;
+    const userId = req.userId;
 
-        // Validate courseId
-        if (!mongoose.Types.ObjectId.isValid(courseId)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid course ID',
-                statusCode: 400,
-            });
-        }
+    console.log(`[DEBUG] Request received - userId: ${userId}, courseId: ${courseId}`);
 
-        // Check if course exists
-        const course = await Course.findById(courseId);
-        if (!course) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Course not found',
-                statusCode: 404,
-            });
-        }
-
-        // Check if user exists in UserAuth
-        const user = await UserAuth.findById(userId);
-        if (!user) {
-            console.log("User not found for userId:", userId);
-            return apiResponse(res, {
-                success: false,
-                message: 'User not found',
-                statusCode: 404,
-            });
-        }
-
-        // Check if user has completed the course
-        const userCourse = await UsermainCourse.findOne({ userId, courseId });
-        console.log("internshipDaata",userCourse)
-        if (!userCourse || userCourse.status !== 'Course Completed' || !userCourse.isCompleted) {
-            return apiResponse(res, {
-                success: false,
-                message: 'You must complete the course to request an internship letter',
-                statusCode: 403,
-            });
-        }
-        const existingRequest = await InternshipLetter.findOne({ userId, courseId });
-        if (existingRequest) {
-            console.log('requestInternshipLetter: Existing internship letter request found:', { internshipLetterId: existingRequest._id, paymentStatus: existingRequest.paymentStatus });
-            // Check paymentStatus
-            if (existingRequest.paymentStatus === true) {
-                console.log('requestInternshipLetter: Payment already completed for internship letter:', { internshipLetterId: existingRequest._id });
-                return apiResponse(res, {
-                    success: false,
-                    message: 'Payment already completed for this internship letter request',
-                    statusCode: 400,
-                });
-            }
-            console.log('requestInternshipLetter: Payment not completed, allowing new order creation');
-        } else {
-            console.log('requestInternshipLetter: No existing internship letter request found');
-        }
-
-        // Create Razorpay order with a shorter receipt
-        const receipt = `r_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
-        const orderOptions = {
-            amount: course.CourseInternshipPrice * 100,
-            currency: 'INR',
-            receipt: receipt,
-        };
-
-        const razorpayOrder = await razorpayInstance.orders.create(orderOptions);
-
-        // Create new internship letter request
-        const internshipLetter = new InternshipLetter({
-            userId,
-            courseId,
-            paymentStatus: false,
-            uploadStatus: 'upload',
-            paymentAmount: course.CourseInternshipPrice,
-            paymentCurrency: 'INR',
-            razorpayOrderId: razorpayOrder.id,
-        });
-
-        await internshipLetter.save();
-
-        return apiResponse(res, {
-            success: true,
-            message: 'Internship letter request created successfully',
-            data: { internshipLetter, razorpayOrder },
-            statusCode: 201,
-        });
-    } catch (error) {
-        console.error('Error requesting internship letter:', error);
-        return apiResponse(res, {
-            success: false,
-            message: 'Server error',
-            statusCode: 500,
-        });
+    // Validate courseId
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      console.log(`[DEBUG] Invalid courseId format: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid course ID',
+        statusCode: 400,
+      });
     }
+
+    // Check if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      console.log(`[DEBUG] Course not found for ID: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Course not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if user exists in UserAuth
+    const user = await UserAuth.findById(userId);
+    if (!user) {
+      console.log(`[DEBUG] User not found for userId: ${userId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if user has completed the course
+    const userCourse = await UsermainCourse.findOne({ userId, courseId });
+    console.log(`[DEBUG] UsermainCourse data:`, userCourse);
+    if (!userCourse || userCourse.status !== 'Course Completed' || !userCourse.isCompleted) {
+      console.log(`[DEBUG] Course not completed or not enrolled - userId: ${userId}, courseId: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'You must complete the course to request an internship letter',
+        statusCode: 403,
+      });
+    }
+
+    // Check for existing internship letter request
+    let internshipLetter = await InternshipLetter.findOne({ userId, courseId });
+    if (internshipLetter && internshipLetter.paymentStatus === true) {
+      console.log(`[DEBUG] Payment already completed for internship letter - internshipLetterId: ${internshipLetter._id}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Payment already completed for this internship letter request',
+        statusCode: 400,
+      });
+    }
+
+    // Verify internship price
+    if (!course.CourseInternshipPrice || course.CourseInternshipPrice <= 0) {
+      console.log(`[DEBUG] Internship price not defined for courseId: ${courseId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'Internship price not defined for this course',
+        statusCode: 400,
+      });
+    }
+
+    // Create Razorpay order
+    const receipt = `r_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
+    const orderOptions = {
+      amount: course.CourseInternshipPrice * 100, // Convert to paise
+      currency: 'INR',
+      receipt: receipt,
+    };
+
+    const razorpayOrder = await razorpayInstance.orders.create(orderOptions);
+    if (!razorpayOrder || !razorpayOrder.id) {
+      console.log('[DEBUG] Failed to create Razorpay order');
+      return apiResponse(res, {
+        success: false,
+        message: 'Failed to create Razorpay order',
+        statusCode: 500,
+      });
+    }
+
+    if (internshipLetter && internshipLetter.paymentStatus === false) {
+      // Update existing internship letter request with new Razorpay order
+      internshipLetter.razorpayOrderId = razorpayOrder.id;
+      internshipLetter.paymentAmount = course.CourseInternshipPrice;
+      internshipLetter.paymentCurrency = 'INR';
+      internshipLetter.uploadStatus = 'upload';
+      internshipLetter.updatedAt = new Date();
+
+      await internshipLetter.save();
+      console.log(`[DEBUG] Internship letter request updated - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    } else {
+      // Create new internship letter request
+      internshipLetter = new InternshipLetter({
+        userId,
+        courseId,
+        paymentStatus: false,
+        uploadStatus: 'upload',
+        paymentAmount: course.CourseInternshipPrice,
+        paymentCurrency: 'INR',
+        razorpayOrderId: razorpayOrder.id,
+      });
+
+      await internshipLetter.save();
+      console.log(`[DEBUG] Internship letter request created - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    }
+
+    return apiResponse(res, {
+      success: true,
+      message: internshipLetter.isNew ? 'Internship letter request created successfully' : 'Internship letter request updated successfully',
+      data: { internshipLetter, razorpayOrder },
+      statusCode: 201,
+    });
+  } catch (error) {
+    console.error('[DEBUG] Error requesting internship letter:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Server error: ${error.message}`,
+      statusCode: 500,
+    });
+  }
 };
 
 // Verify and Update Payment Status
