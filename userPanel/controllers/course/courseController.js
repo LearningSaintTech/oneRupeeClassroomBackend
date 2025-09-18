@@ -998,6 +998,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
       certificateDescription: course.certificateDescription,
       uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
       price: course.CourseInternshipPrice,
+      certificatePrice: course.CourseInternshipPrice,
       isPaymentDone,
     };
 
