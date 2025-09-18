@@ -53,15 +53,6 @@ exports.buyCourse = async (req, res) => {
     }
     console.log('buyCourse: Subcourse found:', { subcourseId, subcourseName: subcourse.subcourseName, certificatePrice: subcourse.certificatePrice });
 
-    // Check if certificatePrice is defined
-    if (!subcourse.certificatePrice || subcourse.certificatePrice <= 0) {
-      console.log('buyCourse: Invalid or missing certificate price:', { subcourseId, certificatePrice: subcourse.certificatePrice });
-      return apiResponse(res, {
-        success: false,
-        message: 'Invalid or missing certificate price for the subcourse',
-        statusCode: 400,
-      });
-    }
 
     // Check if subcourse is already purchased
     if (user.purchasedsubCourses.includes(subcourseId)) {
