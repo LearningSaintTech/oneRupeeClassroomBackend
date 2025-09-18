@@ -20,9 +20,15 @@ const emitBuyCourse = (io, userId, data) => {
   io.to(userId.toString()).emit(eventNames.BUY_COURSE, data);
 };
 
+const emitGlobalNotification = (io, data) => {
+  io.emit(eventNames.GLOBAL_NOTIFICATION, data);
+};
+
+
 module.exports = {
   emitLiveLesson,
   emitRequestInternshipLetter,
   emitUploadInternshipLetter,
   emitBuyCourse,
+  emitGlobalNotification
 };

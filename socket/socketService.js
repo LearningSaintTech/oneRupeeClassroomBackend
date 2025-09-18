@@ -51,6 +51,13 @@ const SocketService = {
     });
   },
 
+   onGlobalNotification: (callback) => {
+    socket.on('global_notification', (data) => {
+      console.log('Global notification event received:', data);
+      callback(data);
+    });
+  },
+
   disconnect: () => {
     socket.disconnect();
     console.log('Disconnected from Socket.IO server');

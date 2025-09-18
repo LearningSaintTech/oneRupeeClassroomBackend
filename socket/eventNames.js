@@ -4,4 +4,5 @@ module.exports = {
   UPLOAD_INTERNSHIP_LETTER: 'upload_internship_letter',
   BUY_COURSE: 'buy_course',
   JOIN: 'join',
+  GLOBAL_NOTIFICATION: 'global_notification'
 };

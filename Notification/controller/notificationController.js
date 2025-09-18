@@ -330,3 +330,63 @@ exports.deleteNotification = async (req, res) => {
     });
   }
 };
+
+//send global notification 
+exports.sendGlobalNotification = async (req, res) => {
+  console.log('🔔 [sendGlobalNotification] Request received:', {
+    body: req.body,
+    adminId: req.userId,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    const { title, body, data } = req.body;
+    const adminId = req.userId;
+
+    if (!title || !body) {
+      console.log('🔔 [sendGlobalNotification] Missing title or body');
+      return apiResponse(res, {
+        success: false,
+        message: 'Title and body are required',
+        statusCode: 400,
+      });
+    }
+
+    const notificationData = {
+      title,
+      body,
+      senderId: adminId,
+      type: 'admin_global_notification',
+      data,
+    };
+
+    const result = await NotificationService.sendGlobalNotification(notificationData);
+
+    if (!result.success) {
+      console.log('🔔 [sendGlobalNotification] Failed to send:', result.message);
+      return apiResponse(res, {
+        success: false,
+        message: result.message,
+        statusCode: 400,
+      });
+    }
+
+    console.log('🔔 [sendGlobalNotification] Success:', {
+      notificationsSent: result.notifications.length,
+    });
+
+    return apiResponse(res, {
+      success: true,
+      message: result.message,
+      data: { notificationsSent: result.notifications.length },
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('🔔 [sendGlobalNotification] Error:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to send global notification: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};

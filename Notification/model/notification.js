@@ -27,8 +27,9 @@ const notificationSchema = new mongoose.Schema({
       'course_completed', // Sent when a course is completed
       'certificate_downloaded', // Sent when a certificate is downloaded
       'internship_letter_payment', // Sent to admins when internship payment is verified
-       'internship_letter_payment_completed', // Sent to admins when internship payment is completed
-      'internship_letter_uploaded'
+      'internship_letter_payment_completed', // Sent to admins when internship payment is completed
+      'internship_letter_uploaded',
+      'admin_global_notification' 
     ],
     required: true,
   },

@@ -309,6 +309,62 @@ class NotificationService {
       throw error;
     }
   }
+
+  //global notification
+
+   static async sendGlobalNotification(notificationData) {
+    console.log('🔔 [sendGlobalNotification] Starting:', {
+      title: notificationData.title,
+      type: notificationData.type,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      // Get all active users
+      const users = await User.find({ isNumberVerified: true }).select('_id');
+      console.log('🔔 [sendGlobalNotification] Found users:', {
+        count: users.length,
+        userIds: users.map(u => u._id)
+      });
+
+      if (!users.length) {
+        console.log('🔔 [sendGlobalNotification] No active users found');
+        return { success: false, message: 'No active users found' };
+      }
+
+      // Create notifications for all users
+      const notifications = users.map((user) => ({
+        ...notificationData,
+        recipientId: user._id,
+        type: 'admin_global_notification',
+      }));
+
+      console.log('🔔 [sendGlobalNotification] Created notifications:', {
+        count: notifications.length,
+      });
+
+      // Save and send notifications
+      const savedNotifications = [];
+      for (const notification of notifications) {
+        console.log('🔔 [sendGlobalNotification] Processing notification for user:', notification.recipientId);
+        const savedNotification = await this.createAndSendNotification(notification);
+        savedNotifications.push(savedNotification);
+      }
+
+      console.log('🔔 [sendGlobalNotification] Global notifications sent:', {
+        count: savedNotifications.length,
+      });
+
+      return { 
+        success: true, 
+        message: `Global notification sent to ${savedNotifications.length} users`,
+        notifications: savedNotifications
+      };
+    } catch (error) {
+      console.error('🔔 [sendGlobalNotification] Error:', error);
+      return { success: false, message: `Failed to send global notification: ${error.message}` };
+    }
+  }
 }
 
 module.exports = NotificationService;

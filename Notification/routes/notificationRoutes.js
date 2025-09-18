@@ -7,12 +7,14 @@ const {
   markAllAsRead,
   getUnreadCount,
   removeFCMToken,
-  deleteNotification
+  deleteNotification,
+  sendGlobalNotification
 } = require('../controller/notificationController');
 const {verifyToken} = require('../../middlewares/authMiddleware');
 
 // Routes
 router.post('/save-fcm-token', verifyToken, saveFCMToken);
+router.post("/send-global-notification",verifyToken,sendGlobalNotification)
 router.get('/get-notifications', verifyToken, getNotifications);
 router.patch('/read/:notificationId', verifyToken, markAsRead);
 router.patch('/read-all', verifyToken, markAllAsRead);
