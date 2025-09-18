@@ -245,6 +245,7 @@ const checkInternshipStatus = async (req, res) => {
         const internshipLetter = await InternshipLetter.findOne({
             userId,
             courseId,
+            paymentStatus:true
         });
 
         // If no internship letter request exists, return false for isEnrolled and null for uploadStatus
