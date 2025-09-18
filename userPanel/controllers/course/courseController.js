@@ -27,16 +27,16 @@ exports.getAllSubcourses = async (req, res) => {
         console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
         subcourses = await Subcourse.find(
           { _id: { $nin: user.purchasedsubCourses || [] } },
-          'subcourseName thumbnailImageUrl totalLessons avgRating price'
+          'subcourseName thumbnailImageUrl totalLessons avgRating price isUpComingCourse'
         );
         console.log(`Found ${subcourses.length} subcourses where courseId is not in purchasedsubCourses`);
       } else {
         console.log(`User not found for ID: ${userId}, fetching all subcourses...`);
-        subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+        subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price isUpComingCourse');
       }
     } else {
       console.log(`Invalid or missing userId: ${userId}, fetching all subcourses...`);
-      subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price');
+      subcourses = await Subcourse.find({}, 'subcourseName thumbnailImageUrl totalLessons avgRating price isUpComingCourse');
     }
 
     if (!subcourses.length) {

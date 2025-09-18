@@ -66,7 +66,8 @@ exports.createSubcourse = async (req, res) => {
             certificatePrice,
             certificateDescription,
             totalLessons,
-            totalDuration
+            totalDuration,
+            isUpComingCourse
         } = req.body;
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
@@ -129,7 +130,8 @@ exports.createSubcourse = async (req, res) => {
             introVideoUrl,
             totalLessons,
             totalDuration,
-            thumbnailImageUrl: thumbnailUrl
+            thumbnailImageUrl: thumbnailUrl,
+            isUpComingCourse: isUpComingCourse || false
         });
 
         await subcourse.save();
@@ -201,6 +203,7 @@ exports.updateSubcourse = async (req, res) => {
             certificatePrice,
             certificateDescription,
             totalLessons,
+            isUpComingCourse
         } = req.body;
 
         const introVideoFile = req.files?.introVideoUrl?.[0];
@@ -261,6 +264,7 @@ exports.updateSubcourse = async (req, res) => {
         if (certificatePrice) subcourse.certificatePrice = certificatePrice;
         if (certificateDescription) subcourse.certificateDescription = certificateDescription;
         if (totalLessons) subcourse.totalLessons = totalLessons;
+        if (isUpComingCourse !== undefined) subcourse.isUpComingCourse = isUpComingCourse;
 
         // Update intro video if new file is provided
         if (introVideoFile) {

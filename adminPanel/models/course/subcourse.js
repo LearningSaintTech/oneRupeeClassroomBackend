@@ -61,6 +61,10 @@ const subcourseSchema = new mongoose.Schema({
     isbestSeller: {
         type: Boolean,
         default: false
+    },
+    isUpComingCourse:{
+        type:Boolean,
+        default:false
     }
 }, { timestamps: true });
 
