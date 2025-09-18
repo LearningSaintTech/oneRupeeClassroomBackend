@@ -73,9 +73,10 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Check if payment is already completed
-    const existingPayment = await CertificatePayment.findOne({ userId, subcourseId });
-    if (existingPayment && existingPayment.paymentStatus === true) {
+    // Check for existing certificate payment
+    let certificatePayment = await CertificatePayment.findOne({ userId, subcourseId });
+
+    if (certificatePayment && certificatePayment.paymentStatus === true) {
       console.log(`[DEBUG] Payment already completed for subcourseId: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
@@ -112,22 +113,33 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Create new certificate payment request
-    const certificatePayment = new CertificatePayment({
-      userId,
-      subcourseId,
-      paymentStatus: false,
-      paymentAmount: subcourse.certificatePrice,
-      paymentCurrency: 'INR',
-      razorpayOrderId: razorpayOrder.id,
-    });
+    if (certificatePayment && certificatePayment.paymentStatus === false) {
+      // Update existing certificate payment with new Razorpay order
+      certificatePayment.razorpayOrderId = razorpayOrder.id;
+      certificatePayment.paymentAmount = subcourse.certificatePrice;
+      certificatePayment.paymentCurrency = 'INR';
+      certificatePayment.updatedAt = new Date();
 
-    await certificatePayment.save();
+      await certificatePayment.save();
+      console.log(`[DEBUG] Certificate payment updated - subcourseId: ${subcourseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    } else {
+      // Create new certificate payment request
+      certificatePayment = new CertificatePayment({
+        userId,
+        subcourseId,
+        paymentStatus: false,
+        paymentAmount: subcourse.certificatePrice,
+        paymentCurrency: 'INR',
+        razorpayOrderId: razorpayOrder.id,
+      });
 
-    console.log(`[DEBUG] Certificate payment request created - subcourseId: ${subcourseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      await certificatePayment.save();
+      console.log(`[DEBUG] Certificate payment request created - subcourseId: ${subcourseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    }
+
     return apiResponse(res, {
       success: true,
-      message: 'Subcourse certificate payment request created successfully',
+      message: certificatePayment.isNew ? 'Subcourse certificate payment request created successfully' : 'Subcourse certificate payment request updated successfully',
       data: { certificatePayment, razorpayOrder },
       statusCode: 201,
     });
@@ -201,9 +213,10 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Check if payment is already completed
-    const existingPayment = await CertificatePayment.findOne({ userId, courseId });
-    if (existingPayment && existingPayment.paymentStatus === true) {
+    // Check for existing certificate payment
+    let certificatePayment = await CertificatePayment.findOne({ userId, courseId });
+
+    if (certificatePayment && certificatePayment.paymentStatus === true) {
       console.log(`[DEBUG] Payment already completed for courseId: ${courseId}`);
       return apiResponse(res, {
         success: false,
@@ -240,22 +253,33 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Create new certificate payment request
-    const certificatePayment = new CertificatePayment({
-      userId,
-      courseId,
-      paymentStatus: false,
-      paymentAmount: course.courseCertificatePrice,
-      paymentCurrency: 'INR',
-      razorpayOrderId: razorpayOrder.id,
-    });
+    if (certificatePayment && certificatePayment.paymentStatus === false) {
+      // Update existing certificate payment with new Razorpay order
+      certificatePayment.razorpayOrderId = razorpayOrder.id;
+      certificatePayment.paymentAmount = course.courseCertificatePrice;
+      certificatePayment.paymentCurrency = 'INR';
+      certificatePayment.updatedAt = new Date();
 
-    await certificatePayment.save();
+      await certificatePayment.save();
+      console.log(`[DEBUG] Certificate payment updated - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    } else {
+      // Create new certificate payment request
+      certificatePayment = new CertificatePayment({
+        userId,
+        courseId,
+        paymentStatus: false,
+        paymentAmount: course.courseCertificatePrice,
+        paymentCurrency: 'INR',
+        razorpayOrderId: razorpayOrder.id,
+      });
 
-    console.log(`[DEBUG] Certificate payment request created - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      await certificatePayment.save();
+      console.log(`[DEBUG] Certificate payment request created - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+    }
+
     return apiResponse(res, {
       success: true,
-      message: 'Main course certificate payment request created successfully',
+      message: certificatePayment.isNew ? 'Main course certificate payment request created successfully' : 'Main course certificate payment request updated successfully',
       data: { certificatePayment, razorpayOrder },
       statusCode: 201,
     });
