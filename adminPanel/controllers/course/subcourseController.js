@@ -173,6 +173,7 @@ exports.getAllSubcourses = async (req, res) => {
             totalLessons: subcourse.totalLessons,
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
+            isUpComingCourse:subcourse.isUpComingCourse
         }));
 
         return apiResponse(res, {
