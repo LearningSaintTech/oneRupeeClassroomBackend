@@ -415,8 +415,6 @@ exports.downloadCertificate = async (req, res) => {
       });
     }
 
-    // Fetch template
-    console.log('[DEBUG] Fetching certificate template');
     const template = await CertificateTemplate.findOne().sort({ createdAt: -1 });
     if (!template) {
       console.log('[DEBUG] No certificate template found in database');
