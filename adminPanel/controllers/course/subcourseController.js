@@ -450,7 +450,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
     // Fetch all subcourses for the course
     const subcourses = await Subcourse.find(
       { courseId: new mongoose.Types.ObjectId(courseId) },
-      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration'
+      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse'
     );
 
     // Handle case where no subcourses are found
@@ -474,7 +474,8 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       price: subcourse.price,
       avgRating: subcourse.avgRating,
       subCourseDescription: subcourse.subCourseDescription,
-      totalDuration:subcourse.totalDuration
+      totalDuration:subcourse.totalDuration,
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     return apiResponse(res, {
