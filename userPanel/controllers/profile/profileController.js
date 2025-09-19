@@ -114,11 +114,12 @@ const mongoose = require('mongoose');
 exports.updateUserProfile = async (req, res) => {
   try {
     const userId = req.userId;
-    const { address, email } = req.body;
+    const { address, email, fullName } = req.body;
     const profileImageFile = req.file;
 
     console.log("Update request files:", req.file);
     console.log("Update profile image file:", profileImageFile);
+    console.log("Update request body:", { address, email, fullName });
 
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -139,6 +140,21 @@ exports.updateUserProfile = async (req, res) => {
         message: 'User not found',
         statusCode: 404,
       });
+    }
+
+    // Update fullName in UserAuth if provided
+    if (fullName !== undefined) {
+      if (typeof fullName !== 'string' || fullName.trim() === '') {
+        console.log("Invalid fullName:", fullName);
+        return apiResponse(res, {
+          success: false,
+          message: 'Full name must be a non-empty string',
+          statusCode: 400,
+        });
+      }
+      console.log("Updating fullName:", fullName);
+      user.fullName = fullName.trim();
+      await user.save();
     }
 
     // Find or create profile
@@ -192,7 +208,12 @@ exports.updateUserProfile = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: userProfile.isNew ? 'User profile created successfully' : 'User profile updated successfully',
-      data: userProfile,
+      data: {
+        fullName: user.fullName,
+        address: userProfile.address,
+        email: userProfile.email,
+        profileImageUrl: userProfile.profileImageUrl
+      },
       statusCode: userProfile.isNew ? 201 : 200,
     });
   } catch (error) {
