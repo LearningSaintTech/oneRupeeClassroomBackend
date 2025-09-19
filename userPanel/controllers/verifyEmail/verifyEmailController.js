@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const User = require('../../models/Auth/Auth');
+const userProfile = require("../../models/Profile/userProfile")
 const OTP = require('../../models/OTP/otp');
 const { apiResponse } = require("../../../utils/apiResponse")
 
@@ -167,6 +168,13 @@ exports.verifyOTP = async (req, res) => {
 
         // Delete OTP record after successful verification
         await OTP.deleteOne({ _id: otpRecord._id });
+
+        
+        // ✅ Also update userProfile email
+        await userProfile.findOneAndUpdate(
+            { userId: userId },
+            { email: email },
+        );
 
         return apiResponse(res, {
             success: true,
