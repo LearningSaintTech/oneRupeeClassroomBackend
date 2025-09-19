@@ -229,14 +229,14 @@ exports.updateSubcourse = async (req, res) => {
             });
         }
 
-        // Check admin authorization
-        if (subcourse.adminId.toString() !== req.userId) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Unauthorized to update this subcourse',
-                statusCode: 403,
-            });
-        }
+        // // Check admin authorization
+        // if (subcourse.adminId.toString() !== req.userId) {
+        //     return apiResponse(res, {
+        //         success: false,
+        //         message: 'Unauthorized to update this subcourse',
+        //         statusCode: 403,
+        //     });
+        // }
 
         // Validate courseId if provided
         if (courseId) {

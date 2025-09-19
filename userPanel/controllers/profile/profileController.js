@@ -218,7 +218,7 @@ exports.getUserProfile = async (req, res) => {
         }
 
         // Fetch UserAuth to get fullName and mobileNumber
-        const user = await UserAuth.findById(req.userId, 'fullName mobileNumber');
+        const user = await UserAuth.findById(req.userId, 'fullName mobileNumber isEmailVerified');
         if (!user) {
             return apiResponse(res, {
                 success: false,
@@ -238,7 +238,8 @@ exports.getUserProfile = async (req, res) => {
             mobileNumber: user.mobileNumber,
             profileImageUrl: profile ? profile.profileImageUrl : null,
             address: profile ? profile.address : null,
-            email: profile ? profile.email : null
+            email: profile ? profile.email : null,
+            isEmailVerified:user.isEmailVerified
         };
 
         return apiResponse(res, {

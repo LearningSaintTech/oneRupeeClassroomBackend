@@ -38,7 +38,7 @@ const requestInternshipLetter = async (req, res) => {
       });
     }
 
-    // Check if user exists in UserAuth
+    // Check if user exists in UserAuth 
     const user = await UserAuth.findById(userId);
     if (!user) {
       console.log(`[DEBUG] User not found for userId: ${userId}`);
