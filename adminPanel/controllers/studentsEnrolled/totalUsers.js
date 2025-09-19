@@ -6,7 +6,12 @@ const { apiResponse } = require('../../../utils/apiResponse');
 
 exports.getUsersWithCourses = async (req, res) => {
   try {
-    // Aggregate data from User, UserCourse, and UserProfile
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Aggregate data from UserCourse, User, Course, and UserProfile with pagination
     const usersWithCourses = await UserCourse.aggregate([
       {
         $lookup: {
@@ -45,10 +50,12 @@ exports.getUsersWithCourses = async (req, res) => {
           createdAt: -1 // Sort by purchase date (createdAt) descending
         }
       },
+      { $skip: skip },
+      { $limit: limit },
       {
         $project: {
           fullName: '$user.fullName',
-          courseName: '$course.courseName', // Assuming course schema has a 'name' field
+          courseName: '$course.courseName',
           mobileNumber: '$user.mobileNumber',
           email: '$profile.email',
           profileImageUrl: '$profile.profileImageUrl'
@@ -56,9 +63,30 @@ exports.getUsersWithCourses = async (req, res) => {
       }
     ]);
 
+    // Get total count for pagination metadata
+    const totalUsers = await UserCourse.countDocuments({ paymentStatus: true });
+
+    // Handle case where no users with purchased courses are found
+    if (!usersWithCourses.length) {
+      return apiResponse(res, {
+        success: true,
+        message: 'No users with purchased courses found',
+        data: {
+          users: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalUsers / limit),
+            totalUsers,
+            limit,
+          },
+        },
+        statusCode: 200,
+      });
+    }
+
     // Add serial number to each record
     const formattedResult = usersWithCourses.map((item, index) => ({
-      sno: index + 1,
+      sno: skip + index + 1, // Adjust sno based on pagination
       name: item.fullName,
       courseName: item.courseName,
       contact: item.mobileNumber,
@@ -69,20 +97,26 @@ exports.getUsersWithCourses = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Users with purchased courses retrieved successfully',
-      data: formattedResult,
+      data: {
+        users: formattedResult,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalUsers / limit),
+          totalUsers,
+          limit,
+        },
+      },
       statusCode: 200
     });
   } catch (error) {
     console.error('Error fetching users with courses:', error);
     return apiResponse(res, {
       success: false,
-      message: 'Error fetching users with purchased courses',
-      data: null,
+      message: `Error fetching users with purchased courses: ${error.message}`,
       statusCode: 500
     });
   }
 };
-
 
 
 

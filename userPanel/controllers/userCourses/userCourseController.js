@@ -33,15 +33,36 @@ exports.getUserPurchasedSubcourses = async (req, res) => {
       return apiResponse(res, {
         success: true,
         message: 'No purchased subcourses found',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalSubcourses: 0,
+            limit: parseInt(req.query.limit) || 10,
+          },
+        },
         statusCode: 200,
       });
     }
 
-    // Fetch purchased subcourses with required fields
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch purchased subcourses with required fields and pagination
     const subcourses = await Subcourse.find({
       _id: { $in: user.purchasedsubCourses },
-    }).select('subcourseName thumbnailImageUrl rating totalLessons');
+    })
+      .select('subcourseName thumbnailImageUrl rating totalLessons')
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalSubcourses = await Subcourse.countDocuments({
+      _id: { $in: user.purchasedsubCourses },
+    });
 
     // Fetch progress from UserCourse for each purchased subcourse
     const userCourses = await UserCourse.find({
@@ -65,7 +86,15 @@ exports.getUserPurchasedSubcourses = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Purchased subcourses retrieved successfully',
-      data: result,
+      data: {
+        subcourses: result,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalSubcourses / limit),
+          totalSubcourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {
@@ -106,24 +135,55 @@ exports.getUserInProgressSubcourses = async (req, res) => {
       return apiResponse(res, {
         success: true,
         message: 'No in-progress subcourses found',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalSubcourses: 0,
+            limit: parseInt(req.query.limit) || 10,
+          },
+        },
         statusCode: 200,
       });
     }
+
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
     // Fetch UserCourse entries that are not completed
     const userCourses = await UserCourse.find({
       userId,
       subcourseId: { $in: user.purchasedsubCourses },
       isCompleted: false,
-    }).select('subcourseId progress');
+    })
+      .select('subcourseId progress')
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalSubcourses = await UserCourse.countDocuments({
+      userId,
+      subcourseId: { $in: user.purchasedsubCourses },
+      isCompleted: false,
+    });
 
     // If no in-progress subcourses, return empty array
     if (!userCourses || userCourses.length === 0) {
       return apiResponse(res, {
         success: true,
         message: 'No in-progress subcourses found',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalSubcourses / limit),
+            totalSubcourses,
+            limit,
+          },
+        },
         statusCode: 200,
       });
     }
@@ -150,7 +210,15 @@ exports.getUserInProgressSubcourses = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'In-progress subcourses retrieved successfully',
-      data: result,
+      data: {
+        subcourses: result,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalSubcourses / limit),
+          totalSubcourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {
@@ -191,24 +259,55 @@ exports.getUserCompletedSubcourses = async (req, res) => {
       return apiResponse(res, {
         success: true,
         message: 'No completed subcourses found',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalSubcourses: 0,
+            limit: parseInt(req.query.limit) || 10,
+          },
+        },
         statusCode: 200,
       });
     }
+
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
     // Fetch UserCourse entries that are completed
     const userCourses = await UserCourse.find({
       userId,
       subcourseId: { $in: user.purchasedsubCourses },
       isCompleted: true,
-    }).select('subcourseId progress');
+    })
+      .select('subcourseId progress')
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalSubcourses = await UserCourse.countDocuments({
+      userId,
+      subcourseId: { $in: user.purchasedsubCourses },
+      isCompleted: true,
+    });
 
     // If no completed subcourses, return empty array
     if (!userCourses || userCourses.length === 0) {
       return apiResponse(res, {
         success: true,
         message: 'No completed subcourses found',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalSubcourses / limit),
+            totalSubcourses,
+            limit,
+          },
+        },
         statusCode: 200,
       });
     }
@@ -235,7 +334,15 @@ exports.getUserCompletedSubcourses = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Completed subcourses retrieved successfully',
-      data: result,
+      data: {
+        subcourses: result,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalSubcourses / limit),
+          totalSubcourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {

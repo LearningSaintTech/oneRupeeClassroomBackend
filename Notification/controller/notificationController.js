@@ -74,7 +74,7 @@ exports.getNotifications = async (req, res) => {
   });
 
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 10 } = req.query;
     const userId = req.userId;
 
     const result = await NotificationService.getUserNotifications(

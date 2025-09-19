@@ -155,12 +155,32 @@ exports.createSubcourse = async (req, res) => {
 // Get all subcourses 
 exports.getAllSubcourses = async (req, res) => {
     try {
+        // Get pagination parameters from query (default to page 1 and 10 items per page)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch subcourses with pagination
         const subcourses = await Subcourse.find()
-            .populate('courseId', 'courseName');
+            .populate('courseId', 'courseName')
+            .skip(skip)
+            .limit(limit);
+
+        // Get total count for pagination metadata
+        const totalSubcourses = await Subcourse.countDocuments();
+
+        // Handle case where no subcourses are found
+        if (!subcourses.length) {
+            return apiResponse(res, {
+                success: false,
+                message: 'No subcourses found',
+                statusCode: 404,
+            });
+        }
 
         // Add SNo to each subcourse
         const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
-            SNo: index + 1,
+            SNo: skip + index + 1, // Adjust SNo based on pagination
             _id: subcourse._id,
             adminId: subcourse.adminId,
             courseId: subcourse.courseId,
@@ -173,13 +193,21 @@ exports.getAllSubcourses = async (req, res) => {
             totalLessons: subcourse.totalLessons,
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
-            isUpComingCourse:subcourse.isUpComingCourse
+            isUpComingCourse: subcourse.isUpComingCourse
         }));
 
         return apiResponse(res, {
             success: true,
             message: 'Subcourses retrieved successfully',
-            data: subcoursesWithSNo,
+            data: {
+                subcourses: subcoursesWithSNo,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalSubcourses / limit),
+                    totalSubcourses,
+                    limit,
+                },
+            },
             statusCode: 200,
         });
     } catch (error) {
@@ -447,11 +475,23 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       });
     }
 
-    // Fetch all subcourses for the course
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch subcourses for the course with pagination
     const subcourses = await Subcourse.find(
       { courseId: new mongoose.Types.ObjectId(courseId) },
-      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse'
-    );
+      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons avgRating'
+    )
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalSubcourses = await Subcourse.countDocuments({
+      courseId: new mongoose.Types.ObjectId(courseId),
+    });
 
     // Handle case where no subcourses are found
     if (!subcourses.length) {
@@ -459,14 +499,22 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       return apiResponse(res, {
         success: true,
         message: 'No subcourses available for this course',
-        data: [],
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalSubcourses / limit),
+            totalSubcourses,
+            limit,
+          },
+        },
         statusCode: 200,
       });
     }
 
     // Add SNo to each subcourse
     const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
-      SNo: index + 1,
+      SNo: skip + index + 1, // Adjust SNo based on pagination
       _id: subcourse._id,
       subcourseName: subcourse.subcourseName,
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
@@ -474,14 +522,22 @@ exports.getSubcoursesByCourseId = async (req, res) => {
       price: subcourse.price,
       avgRating: subcourse.avgRating,
       subCourseDescription: subcourse.subCourseDescription,
-      totalDuration:subcourse.totalDuration,
-      isUpComingCourse:subcourse.isUpComingCourse
+      totalDuration: subcourse.totalDuration,
+      isUpComingCourse: subcourse.isUpComingCourse
     }));
 
     return apiResponse(res, {
       success: true,
       message: 'Subcourses retrieved successfully',
-      data: subcoursesWithSNo,
+      data: {
+        subcourses: subcoursesWithSNo,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalSubcourses / limit),
+          totalSubcourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {

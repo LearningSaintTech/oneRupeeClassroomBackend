@@ -120,21 +120,36 @@ exports.getFavouriteCourses = async (req, res) => {
         const purchasedSubcourseIds = user.purchasedsubCourses || [];
         console.log(`Purchased subcourses: ${purchasedSubcourseIds}`);
 
-        // Find favorite entries for the user where isLike is true, excluding purchased subcourses
+        // Get pagination parameters from query (default to page 1 and 10 items per page)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Find favorite entries for the user where isLike is true, excluding purchased subcourses, with pagination
         const favourites = await Favourite.find({
             userId,
             isLike: true,
             subcourseId: { $nin: purchasedSubcourseIds }
-        }).populate({
-            path: 'subcourseId',
-            select: 'subcourseName thumbnailImageUrl price avgRating totalLessons'
+        })
+            .populate({
+                path: 'subcourseId',
+                select: 'subcourseName thumbnailImageUrl price avgRating totalLessons'
+            })
+            .skip(skip)
+            .limit(limit);
+
+        // Get total count for pagination metadata
+        const totalCourses = await Favourite.countDocuments({
+            userId,
+            isLike: true,
+            subcourseId: { $nin: purchasedSubcourseIds }
         });
 
         // Map favorites to response format
         const favouriteCourses = favourites.map(favourite => {
             const subcourse = favourite.subcourseId;
             return {
-                id:favourite.subcourseId,
+                id: favourite.subcourseId,
                 isLike: favourite.isLike,
                 subcourseName: subcourse.subcourseName,
                 thumbnailImageUrl: subcourse.thumbnailImageUrl,
@@ -150,7 +165,15 @@ exports.getFavouriteCourses = async (req, res) => {
             return apiResponse(res, {
                 success: true,
                 message: 'No favorite courses available',
-                data: [],
+                data: {
+                    courses: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: Math.ceil(totalCourses / limit),
+                        totalCourses,
+                        limit
+                    }
+                },
                 statusCode: 200,
             });
         }
@@ -158,7 +181,15 @@ exports.getFavouriteCourses = async (req, res) => {
         return apiResponse(res, {
             success: true,
             message: 'Favorite courses retrieved successfully',
-            data: favouriteCourses,
+            data: {
+                courses: favouriteCourses,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalCourses / limit),
+                    totalCourses,
+                    limit
+                }
+            },
             statusCode: 200,
         });
     } catch (error) {

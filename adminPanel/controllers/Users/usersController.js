@@ -7,7 +7,12 @@ const {exportToCsv} = require("../../../utils/exportToCsv");
 
 exports.getPurchasedMainCourseUsers = async (req, res) => {
   try {
-    // Aggregate data from UsermainCourse, User, UserProfile, and Course
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Aggregate data from UsermainCourse, User, UserProfile, and Course with pagination
     const purchasedUsers = await UsermainCourse.aggregate([
       {
         $lookup: {
@@ -41,6 +46,8 @@ exports.getPurchasedMainCourseUsers = async (req, res) => {
           createdAt: -1 // Sort by purchase date (createdAt) descending
         }
       },
+      { $skip: skip },
+      { $limit: limit },
       {
         $project: {
           fullName: '$user.fullName',
@@ -53,13 +60,34 @@ exports.getPurchasedMainCourseUsers = async (req, res) => {
       }
     ]);
 
+    // Get total count for pagination metadata
+    const totalUsers = await UsermainCourse.countDocuments();
+
+    // Handle case where no purchased users are found
+    if (!purchasedUsers.length) {
+      return apiResponse(res, {
+        success: true,
+        message: 'No users found who purchased main courses',
+        data: {
+          users: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalUsers / limit),
+            totalUsers,
+            limit,
+          },
+        },
+        statusCode: 200,
+      });
+    }
+
     // Add serial number to each record
     const formattedResult = purchasedUsers.map((item, index) => ({
-      sno: index + 1,
+      sno: skip + index + 1, // Adjust sno based on pagination
       name: item.fullName,
       courseName: item.courseName,
       contact: item.mobileNumber,
-      profileImageUrl :item.profileImageUrl,
+      profileImageUrl: item.profileImageUrl,
       email: item.email || 'N/A',
       status: item.status
     }));
@@ -67,15 +95,22 @@ exports.getPurchasedMainCourseUsers = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Users who purchased main courses retrieved successfully',
-      data: formattedResult,
+      data: {
+        users: formattedResult,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalUsers / limit),
+          totalUsers,
+          limit,
+        },
+      },
       statusCode: 200
     });
   } catch (error) {
     console.error('Error fetching purchased main course users:', error);
     return apiResponse(res, {
       success: false,
-      message: 'Error fetching users who purchased main courses',
-      data: null,
+      message: `Error fetching users who purchased main courses: ${error.message}`,
       statusCode: 500
     });
   }

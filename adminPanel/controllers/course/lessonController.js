@@ -277,6 +277,11 @@ exports.createLesson = async (req, res) => {
 // Get all lessons
 exports.getAllLessons = async (req, res) => {
     try {
+        // Get pagination parameters from query (default to page 1 and 10 items per page)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
         let query = Lesson.find()
             .populate('courseId', 'courseName');
 
@@ -286,10 +291,35 @@ exports.getAllLessons = async (req, res) => {
             console.warn('subcourse model not registered, skipping subcourseId population');
         }
 
-        const lessons = await query;
+        // Apply pagination to the query
+        const lessons = await query
+            .skip(skip)
+            .limit(limit);
 
+        // Get total count for pagination metadata
+        const totalLessons = await Lesson.countDocuments();
+
+        // Handle case where no lessons are found
+        if (!lessons.length) {
+            return apiResponse(res, {
+                success: true,
+                message: 'No lessons found',
+                data: {
+                    lessons: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: Math.ceil(totalLessons / limit),
+                        totalLessons,
+                        limit,
+                    },
+                },
+                statusCode: 200,
+            });
+        }
+
+        // Add SNo to each lesson
         const lessonsWithSNoAndDuration = lessons.map((lesson, index) => ({
-            SNo: index + 1,
+            SNo: skip + index + 1, // Adjust SNo based on pagination
             _id: lesson._id,
             adminId: lesson.adminId,
             courseId: lesson.courseId,
@@ -308,7 +338,15 @@ exports.getAllLessons = async (req, res) => {
         return apiResponse(res, {
             success: true,
             message: 'Lessons retrieved successfully',
-            data: lessonsWithSNoAndDuration,
+            data: {
+                lessons: lessonsWithSNoAndDuration,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalLessons / limit),
+                    totalLessons,
+                    limit,
+                },
+            },
             statusCode: 200,
         });
     } catch (error) {
@@ -693,11 +731,23 @@ exports.getLessonsBySubcourseId = async (req, res) => {
       });
     }
 
-    // Fetch all lessons for the subcourse
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch lessons for the subcourse with pagination
     const lessons = await Lesson.find(
       { subcourseId: new mongoose.Types.ObjectId(subcourseId) },
-      'lessonName duration'
-    );
+      'lessonName duration thumbnailImageUrl description'
+    )
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalLessons = await Lesson.countDocuments({
+      subcourseId: new mongoose.Types.ObjectId(subcourseId),
+    });
 
     // Handle case where no lessons are found
     if (!lessons.length) {
@@ -705,25 +755,41 @@ exports.getLessonsBySubcourseId = async (req, res) => {
       return apiResponse(res, {
         success: true,
         message: 'No lessons available for this subcourse',
-        data: [],
+        data: {
+          lessons: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalLessons / limit),
+            totalLessons,
+            limit,
+          },
+        },
         statusCode: 200,
       });
     }
 
     // Add SNo to each lesson
     const lessonsWithSNo = lessons.map((lesson, index) => ({
-      SNo: index + 1,
+      SNo: skip + index + 1, // Adjust SNo based on pagination
       _id: lesson._id,
       lessonName: lesson.lessonName,
       thumbnailImageUrl: lesson.thumbnailImageUrl,
       duration: lesson.duration,
-      description:lesson.description
+      description: lesson.description
     }));
 
     return apiResponse(res, {
       success: true,
       message: 'Lessons retrieved successfully',
-      data: lessonsWithSNo,
+      data: {
+        lessons: lessonsWithSNo,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalLessons / limit),
+          totalLessons,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {

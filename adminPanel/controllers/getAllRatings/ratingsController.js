@@ -4,27 +4,46 @@ const {exportToCsv} = require("../../../utils/exportToCsv");
 
 exports.getAllSubcourseNameAndAvgRating = async (req, res) => {
   try {
-    // Fetch all subcourse names and average ratings
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch subcourse names and average ratings with pagination
     const subcourses = await Subcourse.aggregate([
       {
         $project: {
           subcourseName: 1,
           avgRating: 1
         }
-      }
+      },
+      { $skip: skip },
+      { $limit: limit }
     ]);
+
+    // Get total count for pagination metadata
+    const totalSubcourses = await Subcourse.countDocuments();
 
     if (!subcourses.length) {
       return apiResponse(res, {
         success: false,
         message: 'No subcourses found',
+        data: {
+          subcourses: [],
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalSubcourses / limit),
+            totalSubcourses,
+            limit,
+          },
+        },
         statusCode: 404,
       });
     }
 
     // Add SNo to each subcourse
     const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
-      SNo: index + 1,
+      SNo: skip + index + 1, // Adjust SNo based on pagination
       subcourseName: subcourse.subcourseName,
       avgRating: subcourse.avgRating,
     }));
@@ -32,7 +51,15 @@ exports.getAllSubcourseNameAndAvgRating = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Subcourses retrieved successfully',
-      data: subcoursesWithSNo,
+      data: {
+        subcourses: subcoursesWithSNo,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalSubcourses / limit),
+          totalSubcourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {
@@ -44,7 +71,6 @@ exports.getAllSubcourseNameAndAvgRating = async (req, res) => {
     });
   }
 };
-
 
 
 exports.searchSubcoursesByKeyword = async (req, res) => {

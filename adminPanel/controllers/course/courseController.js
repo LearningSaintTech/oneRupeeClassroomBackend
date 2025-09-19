@@ -57,11 +57,31 @@ exports.createCourse = async (req, res) => {
 // Get all courses
 exports.getAllCourses = async (req, res) => {
   try {
-    const courses = await Course.find();
-    
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch courses with pagination
+    const courses = await Course.find()
+      .skip(skip)
+      .limit(limit);
+
+    // Get total count for pagination metadata
+    const totalCourses = await Course.countDocuments();
+
+    // Handle case where no courses are found
+    if (!courses.length) {
+      return apiResponse(res, {
+        success: false,
+        message: 'No courses found',
+        statusCode: 404,
+      });
+    }
+
     // Add SNo to each course
     const coursesWithSNo = courses.map((course, index) => ({
-      SNo: index + 1,
+      SNo: skip + index + 1, // Adjust SNo based on pagination
       _id: course._id,
       courseName: course.courseName,
       CoverImageUrl: course.CoverImageUrl,
@@ -71,7 +91,15 @@ exports.getAllCourses = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'Courses retrieved successfully',
-      data: coursesWithSNo,
+      data: {
+        courses: coursesWithSNo,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalCourses / limit),
+          totalCourses,
+          limit,
+        },
+      },
       statusCode: 200,
     });
   } catch (error) {

@@ -83,7 +83,6 @@ exports.submitRating = async (req, res) => {
 exports.getAllRatings = async (req, res) => {
   try {
     const { subcourseId } = req.query;
-    console.log("id", subcourseId)
     const userId = req.userId;
 
     // Validate subcourseId
@@ -95,7 +94,6 @@ exports.getAllRatings = async (req, res) => {
       });
     }
 
-    
     // Check if user exists in UserAuth
     const user = await UserAuth.findById(userId);
     if (!user) {
@@ -107,8 +105,12 @@ exports.getAllRatings = async (req, res) => {
       });
     }
 
+    // Get pagination parameters from query (default to page 1 and 10 items per page)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    // Fetch all ratings for the subcourse with user and profile details
+    // Fetch all ratings for the subcourse with user and profile details with pagination
     const ratings = await Rating.aggregate([
       { $match: { subcourseId: new mongoose.Types.ObjectId(subcourseId) } },
       {
@@ -141,8 +143,15 @@ exports.getAllRatings = async (req, res) => {
           profileImageUrl: '$profile.profileImageUrl',
           rating: '$rating'
         }
-      }
+      },
+      { $skip: skip },
+      { $limit: limit }
     ]);
+
+    // Get total count for pagination metadata
+    const totalRatings = await Rating.countDocuments({
+      subcourseId: new mongoose.Types.ObjectId(subcourseId),
+    });
 
     // Format the response data
     const formattedRatings = ratings.map(rating => ({
@@ -153,13 +162,23 @@ exports.getAllRatings = async (req, res) => {
     }));
 
     return apiResponse(res, {
+      success: true,
       message: 'All ratings retrieved successfully',
-      data: formattedRatings
+      data: {
+        ratings: formattedRatings,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalRatings / limit),
+          totalRatings,
+          limit,
+        },
+      },
+      statusCode: 200,
     });
   } catch (error) {
     return apiResponse(res, {
       success: false,
-      message: 'Error retrieving ratings: ' + error.message,
+      message: `Error retrieving ratings: ${error.message}`,
       statusCode: 500
     });
   }
