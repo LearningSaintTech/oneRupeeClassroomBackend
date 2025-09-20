@@ -33,6 +33,8 @@ const notificationRoutes = require("./Notification/routes/notificationRoutes");
 const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
 const startLessonReminder = require('./cron/lessonReminders');
 const eventNames = require('./socket/eventNames');
+const NotificationCleanup = require('./cron/clearNotification');
+
 
 require('dotenv').config();
 

@@ -312,11 +312,13 @@ class NotificationService {
 
   //global notification
 
-   static async sendGlobalNotification(notificationData) {
+   // Global notification with batching
+  static async sendGlobalNotification(notificationData, batchSize = 100) {
     console.log('🔔 [sendGlobalNotification] Starting:', {
       title: notificationData.title,
       type: notificationData.type,
       timestamp: new Date().toISOString(),
+      batchSize,
     });
 
     try {
@@ -343,12 +345,40 @@ class NotificationService {
         count: notifications.length,
       });
 
-      // Save and send notifications
+      // Process notifications in batches
       const savedNotifications = [];
-      for (const notification of notifications) {
-        console.log('🔔 [sendGlobalNotification] Processing notification for user:', notification.recipientId);
-        const savedNotification = await this.createAndSendNotification(notification);
-        savedNotifications.push(savedNotification);
+      for (let i = 0; i < notifications.length; i += batchSize) {
+        const batch = notifications.slice(i, i + batchSize);
+        console.log('🔔 [sendGlobalNotification] Processing batch:', {
+          batchNumber: Math.floor(i / batchSize) + 1,
+          batchSize: batch.length,
+          startIndex: i,
+          endIndex: i + batch.length - 1,
+        });
+
+        // Process batch concurrently
+        const batchPromises = batch.map(async (notification) => {
+          console.log('🔔 [sendGlobalNotification] Processing notification for user:', notification.recipientId);
+          try {
+            const savedNotification = await this.createAndSendNotification(notification);
+            return savedNotification;
+          } catch (error) {
+            console.error('🔔 [sendGlobalNotification] Error processing notification for user:', {
+              recipientId: notification.recipientId,
+              error: error.message,
+            });
+            return null; // Return null for failed notifications to avoid breaking the batch
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        savedNotifications.push(...batchResults.filter(n => n)); // Filter out null results
+
+        console.log('🔔 [sendGlobalNotification] Batch processed:', {
+          batchNumber: Math.floor(i / batchSize) + 1,
+          notificationsProcessed: batchResults.length,
+          successfulNotifications: batchResults.filter(n => n).length,
+        });
       }
 
       console.log('🔔 [sendGlobalNotification] Global notifications sent:', {
