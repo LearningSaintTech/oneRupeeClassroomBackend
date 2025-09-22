@@ -236,15 +236,30 @@ exports.removeFCMToken = async (req, res) => {
       });
     }
 
-    const query = { userId };
-    if (fcmToken) query.fcmToken = fcmToken;
-    if (deviceId) query.deviceId = deviceId;
+    // Build query to find the document with the specific token in the tokens array
+    const query = { 
+      userId,
+      'tokens.fcmToken': fcmToken,
+      'tokens.deviceId': deviceId
+    };
 
+    console.log('🔔 [removeFCMToken] Query:', JSON.stringify(query, null, 2));
+
+    // Remove the specific token from the array
     const result = await FCMToken.findOneAndUpdate(
       query,
-      { isActive: false },
+      { 
+        $pull: { 
+          tokens: {
+            fcmToken: fcmToken,
+            deviceId: deviceId
+          }
+        }
+      },
       { new: true }
     );
+
+    console.log('🔔 [removeFCMToken] Delete result:', result ? 'Token found and deleted' : 'Token not found');
 
     if (!result) {
       console.log('🔔 [removeFCMToken] FCM token not found');
@@ -255,7 +270,7 @@ exports.removeFCMToken = async (req, res) => {
       });
     }
 
-    console.log('🔔 [removeFCMToken] FCM token deactivated:', {
+    console.log('🔔 [removeFCMToken] FCM token deleted:', {
       userId,
       deviceId,
       fcmToken,
@@ -263,14 +278,14 @@ exports.removeFCMToken = async (req, res) => {
 
     return apiResponse(res, {
       success: true,
-      message: 'FCM token deactivated successfully',
+      message: 'FCM token deleted successfully',
       statusCode: 200,
     });
   } catch (error) {
     console.error('🔔 [removeFCMToken] Error:', error);
     return apiResponse(res, {
       success: false,
-      message: `Failed to deactivate FCM token: ${error.message}`,
+      message: `Failed to delete FCM token: ${error.message}`,
       statusCode: 500,
     });
   }
