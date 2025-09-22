@@ -25,15 +25,15 @@ const lessonSchema = new mongoose.Schema({
     },
     date: {
         type: Date,
-        required: true
+        // required: true
     },
     startTime: {
         type: String,
-        required: true
+        // required: true
     },
     endTime: {
         type: String,
-        required: true
+        // required: true
     },
     recordedVideoLink: {
         type: String,
@@ -48,7 +48,7 @@ const lessonSchema = new mongoose.Schema({
     },
     duration: {
         type: String,
-        required: true
+        // required: true
     },
     LiveStatus: {
         type: Boolean,

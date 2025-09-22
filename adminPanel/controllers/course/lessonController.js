@@ -129,7 +129,7 @@ exports.createLesson = async (req, res) => {
         console.log("Uploaded file:", { introVideoFile });
 
         // Validate required fields
-        if (!courseId || !subcourseId || !lessonName || !date || !startTime || !endTime || !introVideoFile || !description) {
+        if (!courseId || !subcourseId || !lessonName  || !introVideoFile || !description) {
             return apiResponse(res, {
                 success: false,
                 message: 'All required fields must be provided',
