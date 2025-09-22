@@ -129,7 +129,7 @@ exports.createLesson = async (req, res) => {
         console.log("Uploaded file:", { introVideoFile });
 
         // Validate required fields
-        if (!courseId || !subcourseId || !lessonName  || !introVideoFile || !description) {
+        if (!courseId || !subcourseId || !lessonName || !introVideoFile || !description) {
             return apiResponse(res, {
                 success: false,
                 message: 'All required fields must be provided',
@@ -185,34 +185,42 @@ exports.createLesson = async (req, res) => {
             });
         }
 
-        // Validate date and time formats
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid date format',
-                statusCode: 400,
-            });
-        }
-        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Start time and end time must be in HH:MM format',
-                statusCode: 400,
-            });
+        // Validate date if provided
+        let parsedDate;
+        if (date) {
+            parsedDate = new Date(date);
+            if (isNaN(parsedDate.getTime())) {
+                return apiResponse(res, {
+                    success: false,
+                    message: 'Invalid date format',
+                    statusCode: 400,
+                });
+            }
         }
 
-        // Calculate and format duration
-        const durationInMinutes = calculateDurationInMinutes(startTime, endTime);
-        if (durationInMinutes === null) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid lesson duration',
-                statusCode: 400,
-            });
+        // Validate startTime and endTime if provided
+        let duration;
+        if (startTime && endTime) {
+            const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+                return apiResponse(res, {
+                    success: false,
+                    message: 'Start time and end time must be in HH:MM format',
+                    statusCode: 400,
+                });
+            }
+
+            // Calculate duration if both startTime and endTime are provided
+            const durationInMinutes = calculateDurationInMinutes(startTime, endTime);
+            if (durationInMinutes === null) {
+                return apiResponse(res, {
+                    success: false,
+                    message: 'Invalid lesson duration',
+                    statusCode: 400,
+                });
+            }
+            duration = formatDuration(durationInMinutes);
         }
-        const duration = formatDuration(durationInMinutes);
 
         // Upload intro video to S3
         const introVideoFileName = `lessons/videos/${Date.now()}_${introVideoFile.originalname}`;
@@ -250,13 +258,15 @@ exports.createLesson = async (req, res) => {
 
         await lesson.save();
 
-        // Update subcourse totalDuration
-        const currentTotalDuration = parseDurationToMinutes(subcourse.totalDuration);
-        const newTotalDuration = currentTotalDuration + durationInMinutes;
-        await Subcourse.updateOne(
-            { _id: subcourseId },
-            { $set: { totalDuration: formatDuration(newTotalDuration) } }
-        );
+        // Update subcourse totalDuration if duration is calculated
+        if (duration) {
+            const currentTotalDuration = parseDurationToMinutes(subcourse.totalDuration) || 0;
+            const newTotalDuration = currentTotalDuration + durationInMinutes;
+            await Subcourse.updateOne(
+                { _id: subcourseId },
+                { $set: { totalDuration: formatDuration(newTotalDuration) } }
+            );
+        }
 
         return apiResponse(res, {
             success: true,
