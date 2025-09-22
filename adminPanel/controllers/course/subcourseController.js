@@ -47,8 +47,8 @@ const generateThumbnail = async (videoBuffer, outputFileName) => {
     } finally {
         // Clean up temporary files
         try {
-            await fs.unlink(tempVideoPath).catch(() => {});
-            await fs.unlink(tempThumbnailPath).catch(() => {});
+            await fs.unlink(tempVideoPath).catch(() => { });
+            await fs.unlink(tempThumbnailPath).catch(() => { });
         } catch (cleanupError) {
             console.error('Error cleaning up temporary files:', cleanupError.message);
         }
@@ -391,161 +391,169 @@ exports.deleteSubcourse = async (req, res) => {
 
 // Search subcourses
 exports.searchSubcourses = async (req, res) => {
-  try {
-    const { q } = req.query;
+    try {
+        const { q } = req.query;
 
-    // Validate search query
-    if (!q || typeof q !== 'string') {
-      return apiResponse(res, {
-        success: false,
-        message: 'Search query is required and must be a string',
-        data: null,
-        statusCode: 400,
-      });
+        // Validate search query
+        if (!q || typeof q !== 'string') {
+            return apiResponse(res, {
+                success: false,
+                message: 'Search query is required and must be a string',
+                data: null,
+                statusCode: 400,
+            });
+        }
+
+        // Create search regex for case-insensitive partial matching
+        const searchRegex = new RegExp(q.trim(), 'i');
+
+        // Find subcourses matching the search query
+        const subcourses = await Subcourse.find({
+            subcourseName: searchRegex,
+        })
+            .populate('courseId', 'courseName')
+            .sort({ createdAt: -1 });
+
+        // Format results with SNo and relevant fields
+        const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
+            SNo: index + 1,
+            subcourseId: subcourse._id,
+            subcourseName: subcourse.subcourseName,
+            courseName: subcourse.courseId?.courseName || 'N/A',
+            subCourseDescription: subcourse.subCourseDescription,
+            price: subcourse.price,
+            certificatePrice: subcourse.certificatePrice,
+            certificateDescription: subcourse.certificateDescription,
+            introVideoUrl: subcourse.introVideoUrl,
+            totalLessons: subcourse.totalLessons,
+            totalDuration: subcourse.totalDuration,
+            thumbnailImageUrl: subcourse.thumbnailImageUrl,
+        }));
+
+        return apiResponse(res, {
+            success: true,
+            message: `Found ${subcoursesWithSNo.length} subcourses matching search query`,
+            data: subcoursesWithSNo,
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error searching subcourses:', error);
+        return apiResponse(res, {
+            success: false,
+            message: 'Error searching subcourses',
+            data: null,
+            statusCode: 500,
+        });
     }
-
-    // Create search regex for case-insensitive partial matching
-    const searchRegex = new RegExp(q.trim(), 'i');
-
-    // Find subcourses matching the search query
-    const subcourses = await Subcourse.find({
-      subcourseName: searchRegex,
-    })
-      .populate('courseId', 'courseName')
-      .sort({ createdAt: -1 });
-
-    // Format results with SNo and relevant fields
-    const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
-      SNo: index + 1,
-      subcourseId: subcourse._id,
-      subcourseName: subcourse.subcourseName,
-      courseName: subcourse.courseId?.courseName || 'N/A',
-      subCourseDescription: subcourse.subCourseDescription,
-      price: subcourse.price,
-      certificatePrice: subcourse.certificatePrice,
-      certificateDescription: subcourse.certificateDescription,
-      introVideoUrl: subcourse.introVideoUrl,
-      totalLessons: subcourse.totalLessons,
-      totalDuration: subcourse.totalDuration,
-      thumbnailImageUrl: subcourse.thumbnailImageUrl,
-    }));
-
-    return apiResponse(res, {
-      success: true,
-      message: `Found ${subcoursesWithSNo.length} subcourses matching search query`,
-      data: subcoursesWithSNo,
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error searching subcourses:', error);
-    return apiResponse(res, {
-      success: false,
-      message: 'Error searching subcourses',
-      data: null,
-      statusCode: 500,
-    });
-  }
 };
 
 
 
 exports.getSubcoursesByCourseId = async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    console.log(`Fetching subcourses for courseId: ${courseId}`);
+    try {
+        const { courseId } = req.params;
+        console.log(`Fetching subcourses for courseId: ${courseId}`);
 
-    // Validate courseId
-    if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      console.log(`Invalid course ID: ${courseId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'Invalid course ID',
-        statusCode: 400,
-      });
+        // Validate courseId
+        if (!mongoose.Types.ObjectId.isValid(courseId)) {
+            console.log(`Invalid course ID: ${courseId}`);
+            return apiResponse(res, {
+                success: false,
+                message: 'Invalid course ID',
+                statusCode: 400,
+            });
+        }
+
+        // Check if course exists
+        const course = await Course.findById(courseId);
+        if (!course) {
+            console.log(`Course not found for ID: ${courseId}`);
+            return apiResponse(res, {
+                success: false,
+                message: 'Course not found',
+                statusCode: 404,
+            });
+        }
+
+        // Get pagination parameters from query (default to page 1 and 10 items per page)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch subcourses for the course with pagination
+        const subcourses = await Subcourse.find(
+            { courseId: new mongoose.Types.ObjectId(courseId) },
+            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons avgRating'
+        )
+            .skip(skip)
+            .limit(limit);
+
+        // Get total count for pagination metadata
+        const totalSubcourses = await Subcourse.countDocuments({
+            courseId: new mongoose.Types.ObjectId(courseId),
+        });
+
+        // Handle case where no subcourses are found
+        if (!subcourses.length) {
+            console.log(`No subcourses found for courseId: ${courseId}`);
+            return apiResponse(res, {
+                success: true,
+                message: 'No subcourses available for this course',
+                data: {
+                    subcourses: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: Math.ceil(totalSubcourses / limit),
+                        totalSubcourses,
+                        limit,
+                    },
+                },
+                statusCode: 200,
+            });
+        }
+
+        // Add SNo to each subcourse
+        const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
+            SNo: skip + index + 1,
+            _id: subcourse._id,
+            adminId: subcourse.adminId,
+            courseId: subcourse.courseId,
+            subcourseName: subcourse.subcourseName,
+            subCourseDescription: subcourse.subCourseDescription,
+            price: subcourse.price,
+            certificatePrice: subcourse.certificatePrice,
+            certificateDescription: subcourse.certificateDescription,
+            introVideoUrl: subcourse.introVideoUrl,
+            totalLessons: subcourse.totalLessons,
+            totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+            totalDuration: subcourse.totalDuration,
+            avgRating: subcourse.avgRating,
+            LiveStatus: subcourse.LiveStatus,
+            thumbnailImageUrl: subcourse.thumbnailImageUrl,
+            isbestSeller: subcourse.isbestSeller,
+            isUpComingCourse: subcourse.isUpComingCourse,
+        }));
+
+        return apiResponse(res, {
+            success: true,
+            message: 'Subcourses retrieved successfully',
+            data: {
+                subcourses: subcoursesWithSNo,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalSubcourses / limit),
+                    totalSubcourses,
+                    limit,
+                },
+            },
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error fetching subcourses by courseId:', error);
+        return apiResponse(res, {
+            success: false,
+            message: `Failed to fetch subcourses: ${error.message}`,
+            statusCode: 500,
+        });
     }
-
-    // Check if course exists
-    const course = await Course.findById(courseId);
-    if (!course) {
-      console.log(`Course not found for ID: ${courseId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'Course not found',
-        statusCode: 404,
-      });
-    }
-
-    // Get pagination parameters from query (default to page 1 and 10 items per page)
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    // Fetch subcourses for the course with pagination
-    const subcourses = await Subcourse.find(
-      { courseId: new mongoose.Types.ObjectId(courseId) },
-      'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons avgRating'
-    )
-      .skip(skip)
-      .limit(limit);
-
-    // Get total count for pagination metadata
-    const totalSubcourses = await Subcourse.countDocuments({
-      courseId: new mongoose.Types.ObjectId(courseId),
-    });
-
-    // Handle case where no subcourses are found
-    if (!subcourses.length) {
-      console.log(`No subcourses found for courseId: ${courseId}`);
-      return apiResponse(res, {
-        success: true,
-        message: 'No subcourses available for this course',
-        data: {
-          subcourses: [],
-          pagination: {
-            currentPage: page,
-            totalPages: Math.ceil(totalSubcourses / limit),
-            totalSubcourses,
-            limit,
-          },
-        },
-        statusCode: 200,
-      });
-    }
-
-    // Add SNo to each subcourse
-    const subcoursesWithSNo = subcourses.map((subcourse, index) => ({
-      SNo: skip + index + 1, // Adjust SNo based on pagination
-      _id: subcourse._id,
-      subcourseName: subcourse.subcourseName,
-      thumbnailImageUrl: subcourse.thumbnailImageUrl,
-      totalLessons: subcourse.totalLessons,
-      price: subcourse.price,
-      avgRating: subcourse.avgRating,
-      subCourseDescription: subcourse.subCourseDescription,
-      totalDuration: subcourse.totalDuration,
-      isUpComingCourse: subcourse.isUpComingCourse
-    }));
-
-    return apiResponse(res, {
-      success: true,
-      message: 'Subcourses retrieved successfully',
-      data: {
-        subcourses: subcoursesWithSNo,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(totalSubcourses / limit),
-          totalSubcourses,
-          limit,
-        },
-      },
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error fetching subcourses by courseId:', error);
-    return apiResponse(res, {
-      success: false,
-      message: `Failed to fetch subcourses: ${error.message}`,
-      statusCode: 500,
-    });
-  }
 };

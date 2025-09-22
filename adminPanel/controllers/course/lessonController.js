@@ -101,8 +101,8 @@ const generateThumbnail = async (videoBuffer, outputFileName) => {
     } finally {
         // Clean up temporary files
         try {
-            await fs.unlink(tempVideoPath).catch(() => {});
-            await fs.unlink(tempThumbnailPath).catch(() => {});
+            await fs.unlink(tempVideoPath).catch(() => { });
+            await fs.unlink(tempThumbnailPath).catch(() => { });
         } catch (cleanupError) {
             console.error('Error cleaning up temporary files:', cleanupError.message);
         }
@@ -661,153 +661,163 @@ exports.deleteLesson = async (req, res) => {
 
 
 exports.searchLessons = async (req, res) => {
-  try {
-    const { q } = req.query;
+    try {
+        const { q } = req.query;
 
-    // Validate search query
-    if (!q || typeof q !== 'string') {
-      return apiResponse(res, {
-        success: false,
-        message: 'Search query is required and must be a string',
-        data: null,
-        statusCode: 400,
-      });
+        // Validate search query
+        if (!q || typeof q !== 'string') {
+            return apiResponse(res, {
+                success: false,
+                message: 'Search query is required and must be a string',
+                data: null,
+                statusCode: 400,
+            });
+        }
+
+        // Create search regex for case-insensitive partial matching
+        const searchRegex = new RegExp(q.trim(), 'i');
+
+        // Find lessons matching the search query
+        const lessons = await Lesson.find({
+            lessonName: searchRegex,
+        })
+            .populate('courseId', 'courseName')
+            .populate('subcourseId', 'subcourseName')
+            .sort({ createdAt: -1 });
+
+        // Format results with SNo and relevant fields
+        const lessonsWithSNo = lessons.map((lesson, index) => ({
+            SNo: index + 1,
+            lessonId: lesson._id,
+            lessonName: lesson.lessonName,
+            courseName: lesson.courseId?.courseName || 'N/A',
+            subcourseName: lesson.subcourseId?.subcourseName || 'N/A',
+            duration: lesson.duration,
+        }));
+
+        return apiResponse(res, {
+            success: true,
+            message: `Found ${lessonsWithSNo.length} lessons matching search query`,
+            data: lessonsWithSNo,
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error searching lessons:', error);
+        return apiResponse(res, {
+            success: false,
+            message: 'Error searching lessons',
+            data: null,
+            statusCode: 500,
+        });
     }
-
-    // Create search regex for case-insensitive partial matching
-    const searchRegex = new RegExp(q.trim(), 'i');
-
-    // Find lessons matching the search query
-    const lessons = await Lesson.find({
-      lessonName: searchRegex,
-    })
-      .populate('courseId', 'courseName')
-      .populate('subcourseId', 'subcourseName')
-      .sort({ createdAt: -1 });
-
-    // Format results with SNo and relevant fields
-    const lessonsWithSNo = lessons.map((lesson, index) => ({
-      SNo: index + 1,
-      lessonId: lesson._id,
-      lessonName: lesson.lessonName,
-      courseName: lesson.courseId?.courseName || 'N/A',
-      subcourseName: lesson.subcourseId?.subcourseName || 'N/A',
-      duration: lesson.duration,
-    }));
-
-    return apiResponse(res, {
-      success: true,
-      message: `Found ${lessonsWithSNo.length} lessons matching search query`,
-      data: lessonsWithSNo,
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error searching lessons:', error);
-    return apiResponse(res, {
-      success: false,
-      message: 'Error searching lessons',
-      data: null,
-      statusCode: 500,
-    });
-  }
 };
 
 
 
 
 exports.getLessonsBySubcourseId = async (req, res) => {
-  try {
-    const { subcourseId } = req.params;
-    console.log(`Fetching lessons for subcourseId: ${subcourseId}`);
+    try {
+        const { subcourseId } = req.params;
+        console.log(`Fetching lessons for subcourseId: ${subcourseId}`);
 
-    // Validate subcourseId
-    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
-      console.log(`Invalid subcourse ID: ${subcourseId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'Invalid subcourse ID',
-        statusCode: 400,
-      });
+        // Validate subcourseId
+        if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+            console.log(`Invalid subcourse ID: ${subcourseId}`);
+            return apiResponse(res, {
+                success: false,
+                message: 'Invalid subcourse ID',
+                statusCode: 400,
+            });
+        }
+
+        // Check if subcourse exists
+        const subcourse = await Subcourse.findById(subcourseId);
+        if (!subcourse) {
+            console.log(`Subcourse not found for ID: ${subcourseId}`);
+            return apiResponse(res, {
+                success: false,
+                message: 'Subcourse not found',
+                statusCode: 404,
+            });
+        }
+
+        // Get pagination parameters from query (default to page 1 and 10 items per page)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch lessons for the subcourse with pagination
+        const lessons = await Lesson.find(
+            { subcourseId: new mongoose.Types.ObjectId(subcourseId) },
+            'courseId subcourseId lessonName duration thumbnailImageUrl description classLink date startTime endTime recordedVideoLink introVideoUrl'
+        )
+            .skip(skip)
+            .limit(limit);
+
+        // Get total count for pagination metadata
+        const totalLessons = await Lesson.countDocuments({
+            subcourseId: new mongoose.Types.ObjectId(subcourseId),
+        });
+
+        // Handle case where no lessons are found
+        if (!lessons.length) {
+            console.log(`No lessons found for subcourseId: ${subcourseId}`);
+            return apiResponse(res, {
+                success: true,
+                message: 'No lessons available for this subcourse',
+                data: {
+                    lessons: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: Math.ceil(totalLessons / limit),
+                        totalLessons,
+                        limit,
+                    },
+                },
+                statusCode: 200,
+            });
+        }
+
+        // Add SNo to each lesson
+        const lessonsWithSNo = lessons.map((lesson, index) => ({
+            SNo: skip + index + 1,
+            _id: lesson._id,
+            adminId: lesson.adminId,
+            courseId: lesson.courseId,
+            subcourseId: lesson.subcourseId,
+            lessonName: lesson.lessonName,
+            classLink: lesson.classLink,
+            date: lesson.date,
+            startTime: lesson.startTime,
+            endTime: lesson.endTime,
+            recordedVideoLink: lesson.recordedVideoLink,
+            introVideoUrl: lesson.introVideoUrl,
+            description: lesson.description,
+            duration: lesson.duration,
+            LiveStatus: lesson.LiveStatus,
+            thumbnailImageUrl: lesson.thumbnailImageUrl,
+        }));
+
+        return apiResponse(res, {
+            success: true,
+            message: 'Lessons retrieved successfully',
+            data: {
+                lessons: lessonsWithSNo,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalLessons / limit),
+                    totalLessons,
+                    limit,
+                },
+            },
+            statusCode: 200,
+        });
+    } catch (error) {
+        console.error('Error fetching lessons by subcourseId:', error);
+        return apiResponse(res, {
+            success: false,
+            message: `Failed to fetch lessons: ${error.message}`,
+            statusCode: 500,
+        });
     }
-
-    // Check if subcourse exists
-    const subcourse = await Subcourse.findById(subcourseId);
-    if (!subcourse) {
-      console.log(`Subcourse not found for ID: ${subcourseId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'Subcourse not found',
-        statusCode: 404,
-      });
-    }
-
-    // Get pagination parameters from query (default to page 1 and 10 items per page)
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    // Fetch lessons for the subcourse with pagination
-    const lessons = await Lesson.find(
-      { subcourseId: new mongoose.Types.ObjectId(subcourseId) },
-      'lessonName duration thumbnailImageUrl description'
-    )
-      .skip(skip)
-      .limit(limit);
-
-    // Get total count for pagination metadata
-    const totalLessons = await Lesson.countDocuments({
-      subcourseId: new mongoose.Types.ObjectId(subcourseId),
-    });
-
-    // Handle case where no lessons are found
-    if (!lessons.length) {
-      console.log(`No lessons found for subcourseId: ${subcourseId}`);
-      return apiResponse(res, {
-        success: true,
-        message: 'No lessons available for this subcourse',
-        data: {
-          lessons: [],
-          pagination: {
-            currentPage: page,
-            totalPages: Math.ceil(totalLessons / limit),
-            totalLessons,
-            limit,
-          },
-        },
-        statusCode: 200,
-      });
-    }
-
-    // Add SNo to each lesson
-    const lessonsWithSNo = lessons.map((lesson, index) => ({
-      SNo: skip + index + 1, // Adjust SNo based on pagination
-      _id: lesson._id,
-      lessonName: lesson.lessonName,
-      thumbnailImageUrl: lesson.thumbnailImageUrl,
-      duration: lesson.duration,
-      description: lesson.description
-    }));
-
-    return apiResponse(res, {
-      success: true,
-      message: 'Lessons retrieved successfully',
-      data: {
-        lessons: lessonsWithSNo,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(totalLessons / limit),
-          totalLessons,
-          limit,
-        },
-      },
-      statusCode: 200,
-    });
-  } catch (error) {
-    console.error('Error fetching lessons by subcourseId:', error);
-    return apiResponse(res, {
-      success: false,
-      message: `Failed to fetch lessons: ${error.message}`,
-      statusCode: 500,
-    });
-  }
 };
