@@ -483,7 +483,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
         // Fetch subcourses for the course with pagination
         const subcourses = await Subcourse.find(
             { courseId: new mongoose.Types.ObjectId(courseId) },
-            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons avgRating'
+            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons  certificatePrice certificateDescription introVideoUrl totalLessonsvtotalStudentsEnrolled totalDuration avgRating'
         )
             .skip(skip)
             .limit(limit);
