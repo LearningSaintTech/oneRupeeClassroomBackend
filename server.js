@@ -34,6 +34,7 @@ const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
 const startLessonReminder = require('./cron/lessonReminders');
 const eventNames = require('./socket/eventNames');
 const NotificationCleanup = require('./cron/clearNotification');
+const twofactorRoutes = require('./twofactor/routes/twofactorRoutes'); // NEW: 2Factor routes
 
 
 require('dotenv').config();
@@ -93,6 +94,19 @@ app.get('/', (req, res) => {
   res.send('Server is running!');
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    services: {
+      firebase: 'Available',
+      twilio: 'Available',
+      twofactor: 'Available'
+    }
+  });
+});
+
 // User Routes
 app.use('/api/auth', authRoutes, verifyemailRoutes);
 app.use("/api/user/profile", profileRoutes);
@@ -105,6 +119,9 @@ app.use("/api/user/search", searchRoutes);
 app.use("/api/user/certificate", downloadCertificateRoutes);
 app.use("/api/user/internshipLetter", InternshipLetter);
 app.use("/api/notification", notificationRoutes);
+
+// NEW: 2Factor Routes
+app.use('/api/2factor', twofactorRoutes);
 
 // Admin Routes
 app.use("/api/admin/auth", adminauthRoutes);
@@ -123,4 +140,7 @@ app.use("/api/promo", promoRoutes);
 // Start server
 server.listen(PORT, () => {
   console.log(`🚀 [Server Started] Running on port ${PORT}, Timestamp: ${new Date().toISOString()}`);
+  console.log('📱 Firebase routes: /api/auth/*');
+  console.log('📱 Twilio routes: /api/twilio/*');
+  console.log('📱 2Factor routes: /api/2factor/*');
 });
