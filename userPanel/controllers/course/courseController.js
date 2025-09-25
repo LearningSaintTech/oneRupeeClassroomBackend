@@ -105,24 +105,57 @@ exports.getAllSubcourses = async (req, res) => {
     });
   }
 };
-//get popular courses 
-
+// Get popular courses
 exports.getPopularCourses = async (req, res) => {
   try {
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching popular courses for userId: ${userId}`);
+
     // Extract pagination parameters from query
     const page = parseInt(req.query.page) || 1; // Default to page 1
     const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page
     const skip = (page - 1) * limit; // Calculate skip value for pagination
 
-    // Count total subcourses for pagination metadata
-    const totalSubcourses = await Subcourse.countDocuments();
+    let subcourses = [];
+    let totalSubcourses = 0;
 
-    // Fetch paginated subcourses, sorted by totalStudentsEnrolled (most popular first)
-    const subcourses = await Subcourse.find()
-      .sort({ totalStudentsEnrolled: -1 }) // Descending order
-      .skip(skip)
-      .limit(limit)
-      .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price'); // Select specific fields
+    // Check if userId is valid and fetch purchased subcourses
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Valid userId: ${userId}, checking purchasedsubCourses...`);
+      const user = await User.findById(userId).select('purchasedsubCourses');
+      if (user) {
+        console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
+        // Count total subcourses excluding purchased ones
+        totalSubcourses = await Subcourse.countDocuments({
+          _id: { $nin: user.purchasedsubCourses || [] },
+        });
+        // Fetch paginated subcourses, sorted by totalStudentsEnrolled (most popular first)
+        subcourses = await Subcourse.find({
+          _id: { $nin: user.purchasedsubCourses || [] },
+        })
+          .sort({ totalStudentsEnrolled: -1 }) // Descending order
+          .skip(skip)
+          .limit(limit)
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+        console.log(`Found ${subcourses.length} popular subcourses excluding purchased ones`);
+      } else {
+        console.log(`User not found for ID: ${userId}, fetching all popular subcourses...`);
+        totalSubcourses = await Subcourse.countDocuments();
+        subcourses = await Subcourse.find()
+          .sort({ totalStudentsEnrolled: -1 })
+          .skip(skip)
+          .limit(limit)
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+      }
+    } else {
+      console.log(`Invalid or missing userId: ${userId}, fetching all popular subcourses...`);
+      totalSubcourses = await Subcourse.countDocuments();
+      subcourses = await Subcourse.find()
+        .sort({ totalStudentsEnrolled: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+    }
 
     // Map subcourses to desired output format
     const popularCourses = subcourses.map(subcourse => ({
@@ -132,7 +165,7 @@ exports.getPopularCourses = async (req, res) => {
       totalLessons: subcourse.totalLessons,
       avgRating: subcourse.avgRating,
       totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
-      price: subcourse.price
+      price: subcourse.price,
     }));
 
     // Calculate total pages
@@ -175,24 +208,57 @@ exports.getPopularCourses = async (req, res) => {
   }
 };
 
-//get newest courses
-
+// Get newest courses
 exports.getNewestCourses = async (req, res) => {
   try {
+    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    console.log(`Fetching newest courses for userId: ${userId}`);
+
     // Extract pagination parameters from query
     const page = parseInt(req.query.page) || 1; // Default to page 1
     const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page
     const skip = (page - 1) * limit; // Calculate skip value for pagination
 
-    // Count total subcourses for pagination metadata
-    const totalSubcourses = await Subcourse.countDocuments();
+    let subcourses = [];
+    let totalSubcourses = 0;
 
-    // Fetch paginated subcourses, sorted by createdAt (newest first)
-    const subcourses = await Subcourse.find()
-      .sort({ createdAt: -1 }) // Descending order (newest first)
-      .skip(skip)
-      .limit(limit)
-      .select('subcourseName thumbnailImageUrl totalLessons avgRating price'); // Select specific fields
+    // Check if userId is valid and fetch purchased subcourses
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`Valid userId: ${userId}, checking purchasedsubCourses...`);
+      const user = await User.findById(userId).select('purchasedsubCourses');
+      if (user) {
+        console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
+        // Count total subcourses excluding purchased ones
+        totalSubcourses = await Subcourse.countDocuments({
+          _id: { $nin: user.purchasedsubCourses || [] },
+        });
+        // Fetch paginated subcourses, sorted by createdAt (newest first)
+        subcourses = await Subcourse.find({
+          _id: { $nin: user.purchasedsubCourses || [] },
+        })
+          .sort({ createdAt: -1 }) // Descending order (newest first)
+          .skip(skip)
+          .limit(limit)
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating price');
+        console.log(`Found ${subcourses.length} newest subcourses excluding purchased ones`);
+      } else {
+        console.log(`User not found for ID: ${userId}, fetching all newest subcourses...`);
+        totalSubcourses = await Subcourse.countDocuments();
+        subcourses = await Subcourse.find()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating price');
+      }
+    } else {
+      console.log(`Invalid or missing userId: ${userId}, fetching all newest subcourses...`);
+      totalSubcourses = await Subcourse.countDocuments();
+      subcourses = await Subcourse.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('subcourseName thumbnailImageUrl totalLessons avgRating price');
+    }
 
     // Map subcourses to desired output format
     const newestCourses = subcourses.map(subcourse => ({
@@ -201,7 +267,7 @@ exports.getNewestCourses = async (req, res) => {
       thumbnailImageUrl: subcourse.thumbnailImageUrl,
       totalLessons: subcourse.totalLessons,
       avgRating: subcourse.avgRating,
-      price: subcourse.price
+      price: subcourse.price,
     }));
 
     // Calculate total pages
