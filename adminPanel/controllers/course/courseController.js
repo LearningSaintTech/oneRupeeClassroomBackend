@@ -86,6 +86,9 @@ exports.getAllCourses = async (req, res) => {
       courseName: course.courseName,
       CoverImageUrl: course.CoverImageUrl,
       certificateDescription: course.certificateDescription,
+      courseCertificatePrice:course.courseCertificatePrice,
+      CourseInternshipPrice:course.CourseInternshipPrice
+
     }));
 
     return apiResponse(res, {
