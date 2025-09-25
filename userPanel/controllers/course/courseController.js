@@ -136,7 +136,7 @@ exports.getPopularCourses = async (req, res) => {
           .sort({ totalStudentsEnrolled: -1 }) // Descending order
           .skip(skip)
           .limit(limit)
-          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price isUpComingCourse');
         console.log(`Found ${subcourses.length} popular subcourses excluding purchased ones`);
       } else {
         console.log(`User not found for ID: ${userId}, fetching all popular subcourses...`);
@@ -145,7 +145,7 @@ exports.getPopularCourses = async (req, res) => {
           .sort({ totalStudentsEnrolled: -1 })
           .skip(skip)
           .limit(limit)
-          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price isUpComingCourse');
       }
     } else {
       console.log(`Invalid or missing userId: ${userId}, fetching all popular subcourses...`);
@@ -154,7 +154,7 @@ exports.getPopularCourses = async (req, res) => {
         .sort({ totalStudentsEnrolled: -1 })
         .skip(skip)
         .limit(limit)
-        .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price');
+        .select('subcourseName thumbnailImageUrl totalLessons avgRating totalStudentsEnrolled price isUpComingCourse');
     }
 
     // Map subcourses to desired output format
@@ -166,6 +166,7 @@ exports.getPopularCourses = async (req, res) => {
       avgRating: subcourse.avgRating,
       totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
       price: subcourse.price,
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     // Calculate total pages
@@ -239,7 +240,7 @@ exports.getNewestCourses = async (req, res) => {
           .sort({ createdAt: -1 }) // Descending order (newest first)
           .skip(skip)
           .limit(limit)
-          .select('subcourseName thumbnailImageUrl totalLessons avgRating price');
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating price isUpComingCourse');
         console.log(`Found ${subcourses.length} newest subcourses excluding purchased ones`);
       } else {
         console.log(`User not found for ID: ${userId}, fetching all newest subcourses...`);
@@ -248,7 +249,7 @@ exports.getNewestCourses = async (req, res) => {
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
-          .select('subcourseName thumbnailImageUrl totalLessons avgRating price');
+          .select('subcourseName thumbnailImageUrl totalLessons avgRating price isUpComingCourse');
       }
     } else {
       console.log(`Invalid or missing userId: ${userId}, fetching all newest subcourses...`);
@@ -268,6 +269,7 @@ exports.getNewestCourses = async (req, res) => {
       totalLessons: subcourse.totalLessons,
       avgRating: subcourse.avgRating,
       price: subcourse.price,
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     // Calculate total pages
