@@ -36,7 +36,7 @@ exports.searchSubcourses = async (req, res) => {
     const subcourses = await Subcourse.find({
       subcourseName: { $regex: name, $options: 'i' },
       _id: { $nin: purchasedSubcourseIds }, // Exclude purchased subcourses
-    }).select('subcourseName thumbnailImageUrl avgRating totalLessons');
+    }).select('subcourseName thumbnailImageUrl avgRating totalLessons isUpComingCourse');
 
     // Handle case where no subcourses are found
     if (!subcourses.length) {
@@ -55,6 +55,7 @@ exports.searchSubcourses = async (req, res) => {
       thumbnailImageUrl: subcourse.thumbnailImageUrl || null,
       avgRating: subcourse.avgRating,
       totalLessons: subcourse.totalLessons,
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     return apiResponse(res, {
