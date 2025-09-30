@@ -268,6 +268,7 @@ exports.searchUsers = async (req, res) => {
           courseName: '$course.name', // Assuming course schema has a 'name' field
           mobileNumber: '$user.mobileNumber',
           email: '$profile.email',
+          courseName:"$course.courseName",
           profileImageUrl: '$profile.profileImageUrl',
           status: '$status'
         }
@@ -282,7 +283,8 @@ exports.searchUsers = async (req, res) => {
       contact: item.mobileNumber,
       email: item.email || 'N/A',
       profileImageUrl: item.profileImageUrl || 'N/A',
-      status: item.status
+      status: item.status,
+      courseName:item.courseName
     }));
 
     return apiResponse(res, {
