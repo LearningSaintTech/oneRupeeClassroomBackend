@@ -913,6 +913,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
           price: 1,
           thumbnailImageUrl: 1,
           totalLessons: 1,
+          isUpComingCourse:1,
           isLike: {
             $cond: {
               if: { $eq: [{ $size: '$favourite' }, 0] },
