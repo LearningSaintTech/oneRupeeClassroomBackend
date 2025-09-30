@@ -373,6 +373,9 @@ exports.getAllLessons = async (req, res) => {
 exports.updateLesson = async (req, res) => {
     try {
         const lessonId = req.params.id;
+
+        // Ensure req.body is defined, default to empty object if undefined
+        const body = req.body || {};
         const {
             courseId,
             subcourseId,
@@ -383,7 +386,7 @@ exports.updateLesson = async (req, res) => {
             endTime,
             recordedVideoLink,
             description
-        } = req.body;
+        } = body;
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
         // Validate lessonId
@@ -411,6 +414,30 @@ exports.updateLesson = async (req, res) => {
                 success: false,
                 message: 'Unauthorized to update this lesson',
                 statusCode: 403,
+            });
+        }
+
+        // Check if any fields are provided for update
+        const updateFields = {
+            courseId,
+            subcourseId,
+            lessonName,
+            classLink,
+            date,
+            startTime,
+            endTime,
+            recordedVideoLink,
+            description,
+            introVideoFile
+        };
+        const isAnyFieldProvided = Object.values(updateFields).some(field => field !== undefined && field !== null);
+
+        if (!isAnyFieldProvided) {
+            return apiResponse(res, {
+                success: true,
+                message: 'No fields provided for update, returning current lesson data',
+                data: lesson,
+                statusCode: 200,
             });
         }
 
@@ -470,8 +497,10 @@ exports.updateLesson = async (req, res) => {
             lesson.lessonName = lessonName;
         }
 
-        // Update fields if provided
-        if (classLink) lesson.classLink = classLink;
+        // Update fields if provided (including explicit null/empty for classLink)
+        if (classLink !== undefined) {
+            lesson.classLink = classLink || null;
+        }
         if (description) lesson.description = description;
         if (date) {
             const parsedDate = new Date(date);
