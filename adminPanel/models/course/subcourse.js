@@ -65,6 +65,12 @@ const subcourseSchema = new mongoose.Schema({
     isUpComingCourse:{
         type:Boolean,
         default:false
+    },
+    recordedlesssonsLink:{
+        type:String,
+    },
+    recordedlessonsPrice:{
+        type:Number
     }
 }, { timestamps: true });
 

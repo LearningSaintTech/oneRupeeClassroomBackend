@@ -232,7 +232,7 @@ const certificateTemplate = `
 `;
 
 // Connect to MongoDB
-const DB_URI = 'mongodb+srv://oneRupeeClassroom:ocHVL78lVuW9PZ3R@cluster0.mecqq7t.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+// const DB_URI = 
 
 async function seedDatabase() {
   try {

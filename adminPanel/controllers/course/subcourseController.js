@@ -67,7 +67,9 @@ exports.createSubcourse = async (req, res) => {
             certificateDescription,
             totalLessons,
             totalDuration,
-            isUpComingCourse
+            isUpComingCourse,
+            recordedlesssonsLink,
+            recordedlessonsPrice
         } = req.body;
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
@@ -131,7 +133,9 @@ exports.createSubcourse = async (req, res) => {
             totalLessons,
             totalDuration,
             thumbnailImageUrl: thumbnailUrl,
-            isUpComingCourse: isUpComingCourse || false
+            isUpComingCourse: isUpComingCourse || false,
+            recordedlesssonsLink: recordedlesssonsLink || '',
+            recordedlessonsPrice: recordedlessonsPrice || 0
         });
 
         await subcourse.save();
@@ -193,7 +197,9 @@ exports.getAllSubcourses = async (req, res) => {
             totalLessons: subcourse.totalLessons,
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
-            isUpComingCourse: subcourse.isUpComingCourse
+            isUpComingCourse: subcourse.isUpComingCourse,
+            recordedlesssonsLink: subcourse.recordedlesssonsLink,
+            recordedlessonsPrice: subcourse.recordedlessonsPrice
         }));
 
         return apiResponse(res, {
@@ -232,7 +238,9 @@ exports.updateSubcourse = async (req, res) => {
             certificatePrice,
             certificateDescription,
             totalLessons,
-            isUpComingCourse
+            isUpComingCourse,
+            recordedlesssonsLink,
+            recordedlessonsPrice
         } = req.body;
 
         const introVideoFile = req.files?.introVideoUrl?.[0];
@@ -294,6 +302,8 @@ exports.updateSubcourse = async (req, res) => {
         if (certificateDescription) subcourse.certificateDescription = certificateDescription;
         if (totalLessons) subcourse.totalLessons = totalLessons;
         if (isUpComingCourse !== undefined) subcourse.isUpComingCourse = isUpComingCourse;
+        if (recordedlesssonsLink !== undefined) subcourse.recordedlesssonsLink = recordedlesssonsLink;
+        if (recordedlessonsPrice !== undefined) subcourse.recordedlessonsPrice = recordedlessonsPrice;
 
         // Update intro video if new file is provided
         if (introVideoFile) {
@@ -428,6 +438,8 @@ exports.searchSubcourses = async (req, res) => {
             totalLessons: subcourse.totalLessons,
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
+            recordedlesssonsLink: subcourse.recordedlesssonsLink,
+            recordedlessonsPrice: subcourse.recordedlessonsPrice,
         }));
 
         return apiResponse(res, {
@@ -483,7 +495,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
         // Fetch subcourses for the course with pagination
         const subcourses = await Subcourse.find(
             { courseId: new mongoose.Types.ObjectId(courseId) },
-            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons  certificatePrice certificateDescription introVideoUrl totalLessonsvtotalStudentsEnrolled totalDuration avgRating'
+            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons  certificatePrice certificateDescription introVideoUrl totalLessonsvtotalStudentsEnrolled totalDuration avgRating recordedlesssonsLink recordedlessonsPrice'
         )
             .skip(skip)
             .limit(limit);
@@ -532,6 +544,8 @@ exports.getSubcoursesByCourseId = async (req, res) => {
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             isbestSeller: subcourse.isbestSeller,
             isUpComingCourse: subcourse.isUpComingCourse,
+            recordedlesssonsLink: subcourse.recordedlesssonsLink,
+            recordedlessonsPrice: subcourse.recordedlessonsPrice
         }));
 
         return apiResponse(res, {
