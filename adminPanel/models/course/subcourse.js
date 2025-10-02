@@ -66,11 +66,13 @@ const subcourseSchema = new mongoose.Schema({
         type:Boolean,
         default:false
     },
-    recordedlesssonsLink:{
+    recordedlessonsLink:{
         type:String,
+        default:""
     },
     recordedlessonsPrice:{
-        type:Number
+        type:Number,
+        default:0
     }
 }, { timestamps: true });
 

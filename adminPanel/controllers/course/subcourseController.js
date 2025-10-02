@@ -68,8 +68,6 @@ exports.createSubcourse = async (req, res) => {
             totalLessons,
             totalDuration,
             isUpComingCourse,
-            recordedlesssonsLink,
-            recordedlessonsPrice
         } = req.body;
         const introVideoFile = req.files?.introVideoUrl?.[0];
 
@@ -134,8 +132,6 @@ exports.createSubcourse = async (req, res) => {
             totalDuration,
             thumbnailImageUrl: thumbnailUrl,
             isUpComingCourse: isUpComingCourse || false,
-            recordedlesssonsLink: recordedlesssonsLink || '',
-            recordedlessonsPrice: recordedlessonsPrice || 0
         });
 
         await subcourse.save();
@@ -198,8 +194,6 @@ exports.getAllSubcourses = async (req, res) => {
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             isUpComingCourse: subcourse.isUpComingCourse,
-            recordedlesssonsLink: subcourse.recordedlesssonsLink,
-            recordedlessonsPrice: subcourse.recordedlessonsPrice
         }));
 
         return apiResponse(res, {
@@ -239,8 +233,6 @@ exports.updateSubcourse = async (req, res) => {
             certificateDescription,
             totalLessons,
             isUpComingCourse,
-            recordedlesssonsLink,
-            recordedlessonsPrice
         } = req.body;
 
         const introVideoFile = req.files?.introVideoUrl?.[0];
@@ -302,8 +294,6 @@ exports.updateSubcourse = async (req, res) => {
         if (certificateDescription) subcourse.certificateDescription = certificateDescription;
         if (totalLessons) subcourse.totalLessons = totalLessons;
         if (isUpComingCourse !== undefined) subcourse.isUpComingCourse = isUpComingCourse;
-        if (recordedlesssonsLink !== undefined) subcourse.recordedlesssonsLink = recordedlesssonsLink;
-        if (recordedlessonsPrice !== undefined) subcourse.recordedlessonsPrice = recordedlessonsPrice;
 
         // Update intro video if new file is provided
         if (introVideoFile) {
@@ -438,8 +428,6 @@ exports.searchSubcourses = async (req, res) => {
             totalLessons: subcourse.totalLessons,
             totalDuration: subcourse.totalDuration,
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
-            recordedlesssonsLink: subcourse.recordedlesssonsLink,
-            recordedlessonsPrice: subcourse.recordedlessonsPrice,
         }));
 
         return apiResponse(res, {
@@ -495,7 +483,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
         // Fetch subcourses for the course with pagination
         const subcourses = await Subcourse.find(
             { courseId: new mongoose.Types.ObjectId(courseId) },
-            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons  certificatePrice certificateDescription introVideoUrl totalLessonsvtotalStudentsEnrolled totalDuration avgRating recordedlesssonsLink recordedlessonsPrice'
+            'subcourseName thumbnailImageUrl price subCourseDescription totalDuration isUpComingCourse totalLessons  certificatePrice certificateDescription introVideoUrl totalLessonsvtotalStudentsEnrolled totalDuration avgRating'
         )
             .skip(skip)
             .limit(limit);
@@ -544,8 +532,6 @@ exports.getSubcoursesByCourseId = async (req, res) => {
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             isbestSeller: subcourse.isbestSeller,
             isUpComingCourse: subcourse.isUpComingCourse,
-            recordedlesssonsLink: subcourse.recordedlesssonsLink,
-            recordedlessonsPrice: subcourse.recordedlessonsPrice
         }));
 
         return apiResponse(res, {
@@ -570,4 +556,168 @@ exports.getSubcoursesByCourseId = async (req, res) => {
             statusCode: 500,
         });
     }
+};
+
+
+
+
+// Controller function for adding recorded lessons link and price
+exports.addRecordedLessons = async (req, res) => {
+  try {
+    const  {id}  = req.params;
+    const { recordedlessonsLink, recordedlessonsPrice } = req.body;
+
+    // // Validation: Both fields must be provided for add
+    // if (!recordedlessonsLink || recordedlessonsPrice === undefined) {
+    //   return apiResponse(res, {
+    //     success: false,
+    //     message: 'Both recordedlessonsLink and recordedlessonsPrice must be provided',
+    //     statusCode: 400
+    //   });
+    // }
+
+    // Check if already exists
+    const existingSubcourse = await Subcourse.findById(id);
+    if (!existingSubcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404
+      });
+    }
+
+    if (existingSubcourse.recordedlessonsLink) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Recorded lessons already added. Use update endpoint to modify.',
+        statusCode: 400
+      });
+    }
+
+    // Update the subcourse with the new fields
+    const updatedSubcourse = await Subcourse.findByIdAndUpdate(
+      id,
+      {
+        recordedlessonsLink: recordedlessonsLink,
+        recordedlessonsPrice: recordedlessonsPrice
+      },
+      { new: true, runValidators: true }
+    );
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Recorded lessons added successfully',
+      data: updatedSubcourse
+    });
+  } catch (error) {
+    return apiResponse(res, {
+      success: false,
+      message: error.message || 'Internal server error',
+      statusCode: 500
+    });
+  }
+};
+
+
+exports.updateRecordedLessons = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recordedlessonsLink, recordedlessonsPrice } = req.body;
+
+    // Debug logs - remove in production
+    console.log('Received body:', req.body);
+    console.log('Extracted recordedlessonsLink:', recordedlessonsLink);
+    console.log('Extracted recordedlessonsPrice:', recordedlessonsPrice);
+
+    // // Optional validation: Ensure at least one field is provided
+    // if (!recordedlessonsLink && recordedlessonsPrice === undefined) {
+    //   return apiResponse(res, {
+    //     success: false,
+    //     message: 'At least one of recordedlessonsLink or recordedlessonsPrice must be provided',
+    //     statusCode: 400
+    //   });
+    // }
+
+    // Prepare update object with only the provided fields
+    const updateData = {};
+    if (recordedlessonsLink !== undefined) {
+      // Note: Using exact schema field name 'recordedlesssonsLink' (note the extra 's' in 'lesssons' to match schema)
+      updateData.recordedlessonsLink = recordedlessonsLink;
+      console.log('Setting updateData.recordedlessonsLink to:', recordedlessonsLink);
+    }
+    if (recordedlessonsPrice !== undefined) {
+      updateData.recordedlessonsPrice = recordedlessonsPrice;
+      console.log('Setting updateData.recordedlessonsPrice to:', recordedlessonsPrice);
+    }
+
+    console.log('Update data:', updateData);
+
+    // Update the subcourse
+    const updatedSubcourse = await Subcourse.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedSubcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404
+      });
+    }
+
+    // Debug log the updated document
+    console.log('Updated subcourse:', updatedSubcourse);
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Recorded lessons link and/or price updated successfully',
+      data: updatedSubcourse
+    });
+  } catch (error) {
+    console.error('Error in updateRecordedLessons:', error);
+    return apiResponse(res, {
+      success: false,
+      message: error.message || 'Internal server error',
+      statusCode: 500
+    });
+  }
+};
+
+
+
+exports.getRecordedLessons = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the subcourse
+    const subcourse = await Subcourse.findById(id);
+
+    if (!subcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404
+      });
+    }
+
+    // Extract only the required fields
+    const recordedData = {
+      recordedlesssonsLink: subcourse.recordedlessonsLink,
+      recordedlessonsPrice: subcourse.recordedlessonsPrice
+    };
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Recorded lessons details retrieved successfully',
+      data: recordedData
+    });
+  } catch (error) {
+    return apiResponse(res, {
+      success: false,
+      message: error.message || 'Internal server error',
+      statusCode: 500
+    });
+  }
 };

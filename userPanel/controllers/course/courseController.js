@@ -12,6 +12,7 @@ const subcourse = require('../../../adminPanel/models/course/subcourse');
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 const InternshipLetter = require("../../../adminPanel/models/InternshipLetter/internshipLetter")
 const CertificatePayment = require('../../models/certificates/certificate');
+const RecordedLesson = require('../../models/recordedLesson/recordedLesson');
 
 // Get all subcourses with details
 exports.getAllSubcourses = async (req, res) => {
@@ -332,6 +333,7 @@ exports.getSubcourseById = async (req, res) => {
     // Check payment status if userId is provided
     let paymentStatus = false;
     let subcourseCompleted = false;
+    let isRecordedLessonPurchased = false;
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       console.log(`Valid userId: ${userId}, checking user...`);
       const user = await User.findById(userId);
@@ -350,6 +352,15 @@ exports.getSubcourseById = async (req, res) => {
           console.log(`Subcourse ${subcourseId} completion status: ${subcourseCompleted}`);
         } else {
           console.log(`No UserCourse found for userId: ${userId}, subcourseId: ${subcourseId}`);
+        }
+
+        // Check recorded lesson purchase status
+        const recordedLesson = await RecordedLesson.findOne({ userId, subcourseId, paymentStatus: true });
+        if (recordedLesson) {
+          isRecordedLessonPurchased = true;
+          console.log(`Recorded lesson purchased for subcourse ${subcourseId}: true`);
+        } else {
+          console.log(`No recorded lesson purchase found for userId: ${userId}, subcourseId: ${subcourseId}`);
         }
       } else {
         console.log(`User not found for ID: ${userId}`);
@@ -461,7 +472,8 @@ exports.getSubcourseById = async (req, res) => {
             }
           },
           paymentStatus: { $literal: paymentStatus },
-          isCompleted: { $literal: subcourseCompleted } // Add subcourse completion status
+          isCompleted: { $literal: subcourseCompleted }, // Add subcourse completion status
+          isRecordedLessonPurchased: { $literal: isRecordedLessonPurchased }
         }
       }
     ]).then(results => {

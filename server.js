@@ -34,7 +34,8 @@ const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
 const startLessonReminder = require('./cron/lessonReminders');
 const eventNames = require('./socket/eventNames');
 const NotificationCleanup = require('./cron/clearNotification');
-const twofactorRoutes = require('./twofactor/routes/twofactorRoutes'); // NEW: 2Factor routes
+const twofactorRoutes = require('./twofactor/routes/twofactorRoutes'); 
+const recordedLessonRoutes = require("./userPanel/routes/recordedLessonRoutes");
 
 
 require('dotenv').config();
@@ -119,6 +120,7 @@ app.use("/api/user/search", searchRoutes);
 app.use("/api/user/certificate", downloadCertificateRoutes);
 app.use("/api/user/internshipLetter", InternshipLetter);
 app.use("/api/notification", notificationRoutes);
+app.use("/api/user/recordedLessons",recordedLessonRoutes)
 
 // NEW: 2Factor Routes
 app.use('/api/2factor', twofactorRoutes);
