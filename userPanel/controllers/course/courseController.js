@@ -434,6 +434,7 @@ exports.getSubcourseById = async (req, res) => {
           totalLessons: { $first: '$totalLessons' },
           price:{$first:'$price'},
           recordedlessonsPrice: { $first: '$recordedlessonsPrice' },
+          recordedlessonsLink: { $first: '$recordedlessonsLink' },
           lessons: {
             $push: {
               lessonId: '$lessons._id',
@@ -465,6 +466,7 @@ exports.getSubcourseById = async (req, res) => {
           totalLessons: 1,
           price:1,
           recordedlessonsPrice: 1,
+          recordedlessonsLink: 1,
           lessons: 1,
           isBestSeller: {
             $cond: {
