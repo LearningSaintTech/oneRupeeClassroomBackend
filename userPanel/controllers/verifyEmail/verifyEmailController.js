@@ -13,7 +13,6 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-console.log("dataa", process.env.EMAIL_USER, process.env.EMAIL_PASS)
 
 // Generate a 6-digit OTP
 const generateOTP = () => {

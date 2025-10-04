@@ -1,13 +1,89 @@
 const mongoose = require('mongoose');
-const User = require('../../models/Auth/Auth'); 
-const UserCourse = require('../../models/UserCourse/userCourse'); 
+const User = require('../../models/Auth/Auth');
+const UserCourse = require('../../models/UserCourse/userCourse');
 const Subcourse = require("../../../adminPanel/models/course/subcourse");
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
-const { apiResponse } = require('../../../utils/apiResponse'); 
+const { apiResponse } = require('../../../utils/apiResponse');
 const razorpayInstance = require('../../../config/razorpay');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const crypto = require("crypto");
 const { emitBuyCourse } = require('../../../socket/emitters');
+const jose = require('node-jose');
+const fs = require('fs');
+const axios = require('axios');
+const jwt = require('jsonwebtoken');
+require("dotenv").config();
+
+
+
+// Apple IAP Configuration
+const applePrivateKey = fs.readFileSync('AuthKey_P25JWDSRNB.p8', 'utf8'); // Update path to your .p8 file
+const appleKeyId = process.env.APPLE_KEY_ID; // From App Store Connect
+const appleIssuerId = process.env.APPLE_ISSUER_ID; // From App Store Connect
+
+// Cache for Apple public keys (to avoid frequent fetches)
+let applePublicKeysCache = null;
+let applePublicKeysCacheExpiry = 0;
+
+// Generate JWT for Apple Server API
+function generateAppleJWT() {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: appleIssuerId,
+    iat: now,
+    exp: now + 20 * 60, // 20 minutes
+    aud: 'appstoreconnect-v1'
+  };
+  const token = jwt.sign(payload, applePrivateKey, {
+    algorithm: 'ES256',
+    keyid: appleKeyId
+  });
+  return token;
+}
+
+
+// Fetch Apple Public Keys (with caching)
+async function fetchApplePublicKeys() {
+  const now = Date.now();
+  if (applePublicKeysCache && now < applePublicKeysCacheExpiry) {
+    return applePublicKeysCache;
+  }
+
+  const jwtToken = generateAppleJWT();
+  const res = await axios.get('https://api.storekit.itunes.apple.com/in-app/purchase/publicKeys', {
+    headers: {
+      Authorization: `Bearer ${jwtToken}`
+    }
+  });
+
+  applePublicKeysCache = res.data.keys;
+  applePublicKeysCacheExpiry = now + 24 * 60 * 60 * 1000; // Cache for 24 hours
+  return applePublicKeysCache;
+}
+
+// Verify Signed Transaction Locally
+async function verifyAppleTransactionLocally(signedTransaction) {
+  try {
+    const transaction = JSON.parse(Buffer.from(signedTransaction, 'base64').toString('utf-8'));
+    const keys = await fetchApplePublicKeys();
+
+    // Find key with matching kid
+    const keyData = keys.find(k => k.kid === transaction.kid);
+    if (!keyData) {
+      throw new Error('Public key not found for this transaction');
+    }
+
+    const key = await jose.JWK.asKey(keyData);
+    const verified = await jose.JWS.createVerify(key).verify(signedTransaction);
+
+    // Parsed verified payload
+    const payload = JSON.parse(verified.payload.toString());
+    return payload; // Contains productId, transactionId, purchaseDate, etc.
+  } catch (error) {
+    console.error('verifyAppleTransactionLocally: Error:', error.message);
+    throw error;
+  }
+}
 
 // Buy course API
 exports.buyCourse = async (req, res) => {
@@ -38,7 +114,7 @@ exports.buyCourse = async (req, res) => {
         statusCode: 404,
       });
     }
-    console.log('buyCourse: User found:', { userId});
+    console.log('buyCourse: User found:', { userId });
 
     // Check if subcourse exists and fetch certificatePrice
     console.log('buyCourse: Fetching subcourse with ID:', subcourseId);
@@ -178,7 +254,7 @@ exports.verifyPayment = async (req, res) => {
       console.log('verifyPayment: Missing required fields:', { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId });
       return apiResponse(res, {
         success: false,
-        message: 'Missing required fields: ' + 
+        message: 'Missing required fields: ' +
           (!razorpayOrderId ? 'razorpayOrderId ' : '') +
           (!razorpayPaymentId ? 'razorpayPaymentId ' : '') +
           (!razorpaySignature ? 'razorpaySignature ' : '') +
@@ -229,7 +305,7 @@ exports.verifyPayment = async (req, res) => {
         statusCode: 404,
       });
     }
-    console.log('verifyPayment: User and subcourse found:', { userId,  subcourseId, subcourseName: subcourse.subcourseName });
+    console.log('verifyPayment: User and subcourse found:', { userId, subcourseId, subcourseName: subcourse.subcourseName });
 
     // Update userCourse with payment details
     console.log('verifyPayment: Checking for existing userCourse:', { userId, subcourseId, razorpayOrderId });
@@ -330,6 +406,307 @@ exports.verifyPayment = async (req, res) => {
     return apiResponse(res, {
       success: false,
       message: `Failed to verify payment: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+
+
+
+
+
+// Verify Apple IAP and update status
+exports.verifyApplePurchase = async (req, res) => {
+  try {
+    const { signedTransaction, subcourseId } = req.body;
+    const userId = req.userId;
+    const io = req.app.get('io');
+
+    console.log('verifyApplePurchase: Starting with inputs:', { userId, subcourseId });
+
+    // Validate required fields
+    if (!subcourseId) {
+      console.log('verifyApplePurchase: Missing required fields:', { signedTransaction: !!signedTransaction, subcourseId });
+      return apiResponse(res, {
+        success: false,
+        message: 'Missing required fields: subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(subcourseId)) {
+      console.log('verifyApplePurchase: Invalid ObjectId:', { userId, subcourseId });
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid userId or subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    // Fetch subcourse EARLY (once, for both paths)
+    console.log('verifyApplePurchase: Fetching subcourse with ID:', subcourseId);
+    const subcourse = await Subcourse.findById(subcourseId);
+    if (!subcourse) {
+      console.log('verifyApplePurchase: Subcourse not found for ID:', subcourseId);
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+    console.log('verifyApplePurchase: Subcourse fetched:', { subcourseId, subcourseName: subcourse.subcourseName, appleProductId: subcourse.appleProductId });
+
+    // For mock: Require appleProductId, but use a fallback if missing (for testing)
+    let payload;
+    if (req.query.mock === 'true') {
+      console.log('verifyApplePurchase: Using mock payload for testing');
+      const mockProductId = subcourse.appleProductId || 'com.yourapp.dummy.fallback';  // Fallback for testing
+      payload = {
+        transactionId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        productId: mockProductId,
+        purchaseDate: Date.now(),
+      };
+      console.log('verifyApplePurchase: Mock payload created:', { transactionId: payload.transactionId, productId: payload.productId });
+    } else if (signedTransaction) {
+      // Verify transaction (real path)
+      console.log('verifyApplePurchase: Verifying signed transaction');
+      payload = await verifyAppleTransactionLocally(signedTransaction);
+      console.log('verifyApplePurchase: Transaction verified:', { transactionId: payload.transactionId, productId: payload.productId });
+    } else {
+      console.log('verifyApplePurchase: Missing signedTransaction for real verification');
+      return apiResponse(res, {
+        success: false,
+        message: 'Missing signedTransaction for verification',
+        statusCode: 400,
+      });
+    }
+
+    // Fetch user
+    console.log('verifyApplePurchase: Fetching user with ID:', userId);
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('verifyApplePurchase: User not found:', { userId });
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if productId matches subcourse's appleProductId
+    // For mock fallback, use the same fallback logic
+    const expectedProductId = subcourse.appleProductId || 'com.yourapp.dummy.fallback';
+    if (payload.productId !== expectedProductId) {
+      console.log('verifyApplePurchase: Product mismatch:', { expected: expectedProductId, actual: payload.productId });
+      return apiResponse(res, {
+        success: false,
+        message: 'Product mismatch',
+        statusCode: 400,
+      });
+    }
+    console.log('verifyApplePurchase: User and subcourse found, product matched:', { userId, subcourseId, subcourseName: subcourse.subcourseName });
+
+    // Check if subcourse is already purchased
+    if (user.purchasedsubCourses.includes(subcourseId)) {
+      console.log('verifyApplePurchase: Subcourse already purchased by user:', { userId, subcourseId });
+      return apiResponse(res, {
+        success: true,
+        message: 'Subcourse already purchased',
+        data: { purchased: true },
+        statusCode: 200,
+      });
+    }
+
+    // Check if transaction already processed
+    const existingUserCourse = await UserCourse.findOne({
+      userId,
+      subcourseId,
+      appleTransactionId: payload.transactionId
+    });
+    if (existingUserCourse && existingUserCourse.paymentStatus) {
+      console.log('verifyApplePurchase: Transaction already processed:', { transactionId: payload.transactionId });
+      return apiResponse(res, {
+        success: true,
+        message: 'Purchase already verified',
+        data: { purchased: true },
+        statusCode: 200,
+      });
+    }
+
+    // Check if usermainCourse exists for the user and main course
+    console.log('verifyApplePurchase: Checking for existing usermainCourse:', { userId, courseId: subcourse.courseId });
+    let usermainCourse = await UsermainCourse.findOne({
+      userId,
+      courseId: subcourse.courseId,
+    });
+
+    // If usermainCourse doesn't exist, create a new one
+    if (!usermainCourse) {
+      console.log('verifyApplePurchase: Creating new usermainCourse for:', { userId, courseId: subcourse.courseId });
+      usermainCourse = new UsermainCourse({
+        userId,
+        courseId: subcourse.courseId,
+        status: 'Course Pending',
+        isCompleted: false,
+        isCertificateDownloaded: false,
+      });
+      await usermainCourse.save();
+      console.log('verifyApplePurchase: usermainCourse created:', { usermainCourseId: usermainCourse._id });
+    } else {
+      console.log('verifyApplePurchase: usermainCourse already exists:', { usermainCourseId: usermainCourse._id });
+    }
+
+    // Update or create userCourse with Apple IAP details
+    console.log('verifyApplePurchase: Checking for existing userCourse:', { userId, subcourseId });
+    let userCourse = await UserCourse.findOne({ userId, subcourseId });
+
+    const paymentAmount = subcourse.price || 9; // Use appropriate price field
+    const paymentCurrency = 'INR'; // Apple IAP typically in USD, adjust if needed
+
+    if (!userCourse) {
+      console.log('verifyApplePurchase: Creating new userCourse for:', { userId, subcourseId });
+      userCourse = new UserCourse({
+        userId,
+        courseId: subcourse.courseId,
+        subcourseId,
+        paymentStatus: true,
+        isCompleted: false,
+        progress: '0%',
+        appleTransactionId: payload.transactionId,
+        // appleReceiptData: signedTransaction, // Optional: store full signed transaction
+        paymentAmount,
+        paymentCurrency,
+        paymentDate: new Date(payload.purchaseDate || Date.now()),
+      });
+    } else {
+      console.log('verifyApplePurchase: Updating existing userCourse:', { userCourseId: userCourse._id });
+      userCourse.paymentStatus = true;
+      userCourse.appleTransactionId = payload.transactionId;
+      // userCourse.appleReceiptData = signedTransaction; // Optional
+      userCourse.paymentAmount = paymentAmount;
+      userCourse.paymentCurrency = paymentCurrency;
+      userCourse.paymentDate = new Date(payload.purchaseDate || Date.now());
+    }
+    await userCourse.save();
+    console.log('verifyApplePurchase: userCourse saved:', { userCourseId: userCourse._id, paymentStatus: userCourse.paymentStatus });
+
+    // Add subcourse to user's purchasedsubCourses array
+    console.log('verifyApplePurchase: Adding subcourse to purchasedsubCourses:', { subcourseId });
+    user.purchasedsubCourses.push(subcourseId);
+    await user.save();
+    console.log('verifyApplePurchase: User updated with purchasedsubCourses:', { purchasedsubCourses: user.purchasedsubCourses });
+
+    // Increment totalStudentsEnrolled in subcourse
+    subcourse.totalStudentsEnrolled += 1;
+    await subcourse.save();
+    console.log('verifyApplePurchase: Subcourse updated:', { subcourseId, totalStudentsEnrolled: subcourse.totalStudentsEnrolled });
+
+    // Use a placeholder ObjectId for system-generated notifications
+    const systemSenderId = new mongoose.Types.ObjectId();
+    console.log('verifyApplePurchase: Generated systemSenderId for notification:', systemSenderId);
+
+    // Create and send notification for successful enrollment
+    const notificationData = {
+      recipientId: userId,
+      senderId: systemSenderId,
+      title: 'Subcourse Unlocked',
+      body: `You have successfully enrolled in ${subcourse.subcourseName}. Start learning now!`,
+      type: 'course_unlocked',
+      data: {
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
+      },
+      createdAt: new Date(),
+    };
+    console.log('verifyApplePurchase: Preparing notification:', notificationData);
+
+    // Save and send notification
+    const notification = await NotificationService.createAndSendNotification(notificationData);
+    console.log('verifyApplePurchase: Notification created and sent:', { notificationId: notification._id });
+
+    // Emit buy_course event
+    if (io) {
+      console.log('verifyApplePurchase: Emitting buy_course event to user:', userId);
+      emitBuyCourse(io, userId, {
+        id: notification._id,
+        title: notificationData.title,
+        body: notificationData.body,
+        type: notificationData.type,
+        createdAt: notification.createdAt,
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
+      });
+    } else {
+      console.log('verifyApplePurchase: Socket.IO instance not found');
+    }
+
+    console.log('verifyApplePurchase: Apple IAP verification and subcourse purchase successful');
+    return apiResponse(res, {
+      success: true,
+      message: 'Apple purchase verified and subcourse purchased successfully',
+      data: {
+        userCourse,
+        purchasedsubCourses: user.purchasedsubCourses,
+        totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+        purchased: true,
+      },
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('verifyApplePurchase: Error occurred:', { error: error.message, stack: error.stack });
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to verify Apple purchase: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+// Check if purchase exists (for both Razorpay and Apple IAP)
+exports.checkPurchase = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { subcourseId } = req.body; // Support both query and body
+
+    if (!userId || !subcourseId) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Missing userId or subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(subcourseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid userId or subcourseId',
+        statusCode: 400,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    const purchased = user.purchasedsubCourses.includes(subcourseId);
+    console.log('checkPurchase: Result:', { userId, subcourseId, purchased });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Purchase check completed',
+      data: { purchased },
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('checkPurchase: Error occurred:', { error: error.message });
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to check purchase: ${error.message}`,
       statusCode: 500,
     });
   }

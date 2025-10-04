@@ -141,8 +141,5 @@ app.use("/api/promo", promoRoutes);
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`🚀 [Server Started] Running on port ${PORT}, Timestamp: ${new Date().toISOString()}`);
-  console.log('📱 Firebase routes: /api/auth/*');
-  console.log('📱 Twilio routes: /api/twilio/*');
-  console.log('📱 2Factor routes: /api/2factor/*');
+  console.log(`🚀 [Server Started] Running on port ${PORT}`);
 });

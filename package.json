@@ -27,6 +27,7 @@
     "mongoose": "^8.17.1",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
+    "node-jose": "^2.2.0",
     "nodemailer": "^7.0.5",
     "puppeteer": "^24.17.0",
     "razorpay": "^2.9.6",

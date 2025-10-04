@@ -62,17 +62,21 @@ const subcourseSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    isUpComingCourse:{
-        type:Boolean,
-        default:false
+    isUpComingCourse: {
+        type: Boolean,
+        default: false
     },
-    recordedlessonsLink:{
-        type:String,
-        default:""
+    recordedlessonsLink: {
+        type: String,
+        default: ""
     },
-    recordedlessonsPrice:{
-        type:Number,
-        default:0
+    recordedlessonsPrice: {
+        type: Number,
+        default: 0
+    },
+    appleProductId: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

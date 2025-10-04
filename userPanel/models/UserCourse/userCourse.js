@@ -52,7 +52,10 @@ const userCourseSchema = new mongoose.Schema({
     paymentDate: {
         type: Date,
         required: false,
-    }
+    },
+    appleTransactionId: {
+    type: String,
+},
 },{timestamps: true});
 
 module.exports = mongoose.model('userCourse', userCourseSchema);
