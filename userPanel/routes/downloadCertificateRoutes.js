@@ -1,5 +1,5 @@
 const express = require('express');
-const {requestSubcourseCertificatePayment,requestMainCourseCertificatePayment,verifyCertificatePayment,downloadCertificate,downloadMainCourseCertificate} = require('../controllers/certificate/downloadCertificateController');
+const {requestSubcourseCertificatePayment,requestMainCourseCertificatePayment,verifyCertificatePayment,downloadCertificate,downloadMainCourseCertificate,verifyAppleSubcourseCertificate,verifyAppleMainCourseCertificate} = require('../controllers/certificate/downloadCertificateController');
 const {verifyToken} = require("../../middlewares/authMiddleware");
 
 const router = express.Router();
@@ -17,5 +17,9 @@ router.get('/download-certificate/:subcourseId', verifyToken, downloadCertificat
 
 // Route to download main course certificate
 router.get('/download-main-course-certificate/:courseId', verifyToken, downloadMainCourseCertificate);
+
+// Apple Certificate Verification Routes
+router.post('/subcourse/verify-apple', verifyToken, verifyAppleSubcourseCertificate);
+router.post('/maincourse/verify-apple', verifyToken, verifyAppleMainCourseCertificate);
 
 module.exports = router;

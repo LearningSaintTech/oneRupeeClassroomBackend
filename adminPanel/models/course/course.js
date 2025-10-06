@@ -27,6 +27,14 @@ const courseSchema = new mongoose.Schema({
     certificateDescription: {
         type: String,
         required: true
+    },
+    appleCertificateProductId: {
+        type: String,
+        default: " "
+    },
+    appleInternshipProductId: {
+        type: String,
+        default: " "
     }
 }, { timestamps: true });
 

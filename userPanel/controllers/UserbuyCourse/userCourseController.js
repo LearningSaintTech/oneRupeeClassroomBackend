@@ -14,6 +14,9 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 require("dotenv").config();
 
+// Import fetch (Node.js 18+ has built-in fetch, for older versions use node-fetch)
+const fetch = globalThis.fetch || require('node-fetch');
+
 
 
 // Apple IAP Configuration
@@ -64,24 +67,151 @@ async function fetchApplePublicKeys() {
 // Verify Signed Transaction Locally
 async function verifyAppleTransactionLocally(signedTransaction) {
   try {
-    const transaction = JSON.parse(Buffer.from(signedTransaction, 'base64').toString('utf-8'));
-    const keys = await fetchApplePublicKeys();
+    console.log("🔍 [Apple Receipt] Raw receipt data:", signedTransaction);
+    console.log("🔍 [Apple Receipt] Type:", typeof signedTransaction);
+    console.log("🔍 [Apple Receipt] Length:", signedTransaction.length);
+    
+    // Check if it's a JWT format (has 3 parts separated by dots)
+    const jwtParts = signedTransaction.split('.');
+    console.log("🔍 [Apple Receipt] JWT Parts count:", jwtParts.length);
+    
+    if (jwtParts.length === 3) {
+      console.log("🔍 [Apple Receipt] This is a JWT format");
+      
+      // Decode header (first part)
+      const header = JSON.parse(Buffer.from(jwtParts[0], 'base64').toString('utf-8'));
+      console.log("🔍 [Apple Receipt] JWT Header:", JSON.stringify(header, null, 2));
+      
+      // Decode payload (second part) - this is what we need
+      const payload = JSON.parse(Buffer.from(jwtParts[1], 'base64').toString('utf-8'));
+      console.log("🔍 [Apple Receipt] JWT Payload:", JSON.stringify(payload, null, 2));
+      
+      // Get the kid from header for key verification
+      const kid = header.kid;
+      console.log("🔍 [Apple Receipt] Key ID (kid):", kid);
+      
+      const keys = await fetchApplePublicKeys();
+      console.log("🔍 [Apple Receipt] Available keys:", keys.map(k => ({ kid: k.kid, alg: k.alg })));
 
-    // Find key with matching kid
-    const keyData = keys.find(k => k.kid === transaction.kid);
-    if (!keyData) {
-      throw new Error('Public key not found for this transaction');
+      // Find key with matching kid
+      const keyData = keys.find(k => k.kid === kid);
+      if (!keyData) {
+        throw new Error(`Public key not found for kid: ${kid}`);
+      }
+
+      console.log("🔍 [Apple Receipt] Found matching key:", keyData);
+      
+      const key = await jose.JWK.asKey(keyData);
+      const verified = await jose.JWS.createVerify(key).verify(signedTransaction);
+
+      // Parsed verified payload
+      const verifiedPayload = JSON.parse(verified.payload.toString());
+      console.log("🔍 [Apple Receipt] Verified payload:", JSON.stringify(verifiedPayload, null, 2));
+      
+      return verifiedPayload; // Contains productId, transactionId, purchaseDate, etc.
+    } else {
+      // This is a PKCS#7 receipt - we need to use Apple's server-to-server verification
+      console.log("🔍 [Apple Receipt] This is a PKCS#7 receipt format");
+      console.log("🔍 [Apple Receipt] First 100 characters:", signedTransaction.substring(0, 100));
+      console.log("🔍 [Apple Receipt] Last 100 characters:", signedTransaction.substring(signedTransaction.length - 100));
+      
+      // For PKCS#7 receipts, we should use Apple's server-to-server verification
+      // instead of local verification
+      throw new Error('PKCS#7 receipt detected. Use Apple server-to-server verification instead of local verification.');
     }
-
-    const key = await jose.JWK.asKey(keyData);
-    const verified = await jose.JWS.createVerify(key).verify(signedTransaction);
-
-    // Parsed verified payload
-    const payload = JSON.parse(verified.payload.toString());
-    return payload; // Contains productId, transactionId, purchaseDate, etc.
   } catch (error) {
     console.error('verifyAppleTransactionLocally: Error:', error.message);
+    console.error('verifyAppleTransactionLocally: Stack:', error.stack);
     throw error;
+  }
+}
+
+// Helper function to get Apple error descriptions
+function getAppleErrorDescription(statusCode) {
+  const errorCodes = {
+    21000: 'The App Store could not read the receipt data',
+    21002: 'The receipt data was malformed or missing',
+    21003: 'The receipt could not be authenticated',
+    21004: 'The shared secret you provided does not match the shared secret on file for your account',
+    21005: 'The receipt server is not currently available',
+    21006: 'This receipt is valid but the subscription has expired',
+    21007: 'This receipt is from the sandbox environment, but it was sent to the production environment for verification',
+    21008: 'This receipt is from the production environment, but it was sent to the sandbox environment for verification',
+    21009: 'Internal data access error',
+    21010: 'The user account cannot be found or has been deleted'
+  };
+  
+  return errorCodes[statusCode] || `Unknown error code: ${statusCode}`;
+}
+
+// Apple Server-to-Server Receipt Verification
+async function verifyAppleReceiptWithServer(receiptData, isSandbox = true) {
+  try {
+    console.log("🔍 [Apple Server Verification] Starting server verification");
+    console.log("🔍 [Apple Server Verification] Receipt length:", receiptData.length);
+    console.log("🔍 [Apple Server Verification] Environment:", isSandbox ? 'Sandbox' : 'Production');
+    
+    const sharedSecret = process.env.APPLE_SHARED_SECRET;
+    console.log("🔍 [Apple Server Verification] Loaded APPLE_SHARED_SECRET from environment:", sharedSecret || 'Not set');
+    if (!sharedSecret) {
+      console.error("❌ [Apple Server Verification] APPLE_SHARED_SECRET not found in environment variables");
+      return {
+        success: false,
+        error: 'Apple Shared Secret not configured. Please set APPLE_SHARED_SECRET in your environment variables.',
+        data: null
+      };
+    }
+
+    const url = isSandbox 
+      ? 'https://sandbox.itunes.apple.com/verifyReceipt'
+      : 'https://buy.itunes.apple.com/verifyReceipt';
+    
+    const requestBody = {
+      'receipt-data': receiptData,
+      'password': sharedSecret,
+      'exclude-old-transactions': true
+    };
+    
+    console.log("🔍 [Apple Server Verification] Request body:", {
+      'receipt-data': receiptData.substring(0, 100) + '...',
+      'password': requestBody.password ? '***' : 'not set',
+      'exclude-old-transactions': requestBody['exclude-old-transactions']
+    });
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    const result = await response.json();
+    console.log("🔍 [Apple Server Verification] Apple response:", JSON.stringify(result, null, 2));
+    
+    if (result.status === 0) {
+      console.log("✅ [Apple Server Verification] Receipt verified successfully");
+      return {
+        success: true,
+        data: result,
+        latestReceiptInfo: result.latest_receipt_info || result.receipt?.in_app || []
+      };
+    } else {
+      const errorMessage = getAppleErrorDescription(result.status);
+      console.log("❌ [Apple Server Verification] Receipt verification failed:", result.status, errorMessage);
+      return {
+        success: false,
+        error: `Apple verification failed: ${errorMessage} (Status: ${result.status})`,
+        data: result
+      };
+    }
+  } catch (error) {
+    console.error('verifyAppleReceiptWithServer: Error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      data: null
+    };
   }
 }
 
@@ -457,6 +587,29 @@ exports.verifyApplePurchase = async (req, res) => {
     }
     console.log('verifyApplePurchase: Subcourse fetched:', { subcourseId, subcourseName: subcourse.subcourseName, appleProductId: subcourse.appleProductId });
 
+    // Fetch user early to check if subcourse is already purchased
+    console.log('verifyApplePurchase: Fetching user with ID:', userId);
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('verifyApplePurchase: User not found:', { userId });
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if subcourse is already purchased (moved earlier for efficiency)
+    if (user.purchasedsubCourses.includes(subcourseId)) {
+      console.log('verifyApplePurchase: Subcourse already purchased by user:', { userId, subcourseId });
+      return apiResponse(res, {
+        success: true,
+        message: 'Subcourse already purchased',
+        data: { purchased: true, subcourseId, subcourseName: subcourse.subcourseName },
+        statusCode: 200,
+      });
+    }
+
     // For mock: Require appleProductId, but use a fallback if missing (for testing)
     let payload;
     if (req.query.mock === 'true') {
@@ -469,10 +622,45 @@ exports.verifyApplePurchase = async (req, res) => {
       };
       console.log('verifyApplePurchase: Mock payload created:', { transactionId: payload.transactionId, productId: payload.productId });
     } else if (signedTransaction) {
-      // Verify transaction (real path)
-      console.log('verifyApplePurchase: Verifying signed transaction');
-      payload = await verifyAppleTransactionLocally(signedTransaction);
-      console.log('verifyApplePurchase: Transaction verified:', { transactionId: payload.transactionId, productId: payload.productId });
+      // Verify transaction using Apple's server-to-server verification
+      console.log('verifyApplePurchase: Verifying receipt with Apple servers');
+      const verificationResult = await verifyAppleReceiptWithServer(signedTransaction, true); // true for sandbox
+      
+      if (!verificationResult.success) {
+        console.log('verifyApplePurchase: Apple verification failed:', verificationResult.error);
+        return apiResponse(res, {
+          success: false,
+          message: `Failed to verify Apple purchase: ${verificationResult.error}`,
+          statusCode: 400,
+        });
+      }
+      
+      // Extract transaction data from Apple's response
+      const receiptInfo = verificationResult.latestReceiptInfo;
+      if (!receiptInfo || receiptInfo.length === 0) {
+        console.log('verifyApplePurchase: No transactions found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'No valid transactions found in receipt',
+          statusCode: 400,
+        });
+      }
+      
+      // Get the latest transaction (most recent purchase)
+      const latestTransaction = receiptInfo[receiptInfo.length - 1];
+      payload = {
+        transactionId: latestTransaction.transaction_id,
+        productId: latestTransaction.product_id,
+        purchaseDate: parseInt(latestTransaction.purchase_date_ms),
+        originalTransactionId: latestTransaction.original_transaction_id,
+        webOrderLineItemId: latestTransaction.web_order_line_item_id
+      };
+      
+      console.log('verifyApplePurchase: Apple verification successful:', { 
+        transactionId: payload.transactionId, 
+        productId: payload.productId,
+        purchaseDate: new Date(payload.purchaseDate).toISOString()
+      });
     } else {
       console.log('verifyApplePurchase: Missing signedTransaction for real verification');
       return apiResponse(res, {
@@ -482,17 +670,6 @@ exports.verifyApplePurchase = async (req, res) => {
       });
     }
 
-    // Fetch user
-    console.log('verifyApplePurchase: Fetching user with ID:', userId);
-    const user = await User.findById(userId);
-    if (!user) {
-      console.log('verifyApplePurchase: User not found:', { userId });
-      return apiResponse(res, {
-        success: false,
-        message: 'User not found',
-        statusCode: 404,
-      });
-    }
 
     // Check if productId matches subcourse's appleProductId
     // For mock fallback, use the same fallback logic

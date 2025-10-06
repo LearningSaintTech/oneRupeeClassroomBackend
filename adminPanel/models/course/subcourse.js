@@ -77,6 +77,14 @@ const subcourseSchema = new mongoose.Schema({
     appleProductId: {
         type: String,
         default: ""
+    },
+    appleCertificateProductId: {
+        type: String,
+        default: ""
+    },
+    appleRecordedProductId: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

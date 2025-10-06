@@ -39,7 +39,10 @@ const recordedlessonSchema = new mongoose.Schema({
     paymentDate: {
         type: Date,
         required: false,
-    }
+    },
+    appleTransactionId: {
+        type: String,
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('recordedlesson', recordedlessonSchema);

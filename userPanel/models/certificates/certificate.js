@@ -12,6 +12,9 @@ const CertificatePaymentSchema = new mongoose.Schema({
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
     paymentDate: { type: Date },
+    appleTransactionId: {
+        type: String,
+    },
     createdAt: { type: Date, default: Date.now },
 });
 
