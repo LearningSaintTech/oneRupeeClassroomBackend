@@ -627,7 +627,7 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
     // Create or update certificatePayment with Apple IAP details
     console.log('verifyAppleSubcourseCertificate: Updating/creating certificatePayment:', { userId, subcourseId });
     const paymentAmount = subcourse.certificatePrice || 0;
-    const paymentCurrency = 'USD'; // Apple IAP typically in USD
+    const paymentCurrency = 'INR'; // Apple IAP typically in USD
 
     if (!certificatePayment) {
       console.log('verifyAppleSubcourseCertificate: Creating new certificatePayment for:', { userId, subcourseId });
@@ -862,7 +862,7 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
     // Create or update certificatePayment with Apple IAP details
     console.log('verifyAppleMainCourseCertificate: Updating/creating certificatePayment:', { userId, courseId });
     const paymentAmount = course.courseCertificatePrice || 0;
-    const paymentCurrency = 'USD'; // Apple IAP typically in USD
+    const paymentCurrency = 'INR'; // Apple IAP typically in USD
 
     if (!certificatePayment) {
       console.log('verifyAppleMainCourseCertificate: Creating new certificatePayment for:', { userId, courseId });

@@ -678,7 +678,7 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
     // Create or update internshipLetter with Apple IAP details
     console.log('verifyAppleInternshipLetter: Updating/creating internshipLetter:', { userId, courseId });
     const paymentAmount = course.CourseInternshipPrice || 0;
-    const paymentCurrency = 'USD'; // Apple IAP typically in USD
+    const paymentCurrency = 'INR'; // Apple IAP typically in USD
 
     if (!internshipLetter) {
       console.log('verifyAppleInternshipLetter: Creating new internshipLetter for:', { userId, courseId });
