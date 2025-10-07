@@ -8,7 +8,7 @@ const CertificatePaymentSchema = new mongoose.Schema({
     paymentStatus: { type: Boolean, default: false },
     paymentAmount: { type: Number, required: true },
     paymentCurrency: { type: String, default: 'INR' },
-    razorpayOrderId: { type: String, required: true },
+    razorpayOrderId: { type: String },
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
     paymentDate: { type: Date },
