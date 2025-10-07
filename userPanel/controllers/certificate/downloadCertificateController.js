@@ -471,7 +471,6 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
   try {
     const { signedTransaction, subcourseId } = req.body;
     const userId = req.userId;
-    const io = req.app.get('io');
 
     console.log('verifyAppleSubcourseCertificate: Starting with inputs:', { userId, subcourseId });
 
@@ -650,36 +649,6 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
     }
     await certificatePayment.save();
     console.log('verifyAppleSubcourseCertificate: certificatePayment saved:', { certificatePaymentId: certificatePayment._id, paymentStatus: certificatePayment.paymentStatus });
-
-    // Use a placeholder ObjectId for system-generated notifications
-    const systemSenderId = new mongoose.Types.ObjectId();
-    console.log('verifyAppleSubcourseCertificate: Generated systemSenderId for notification:', systemSenderId);
-
-    // Create and send notification for successful certificate purchase
-    const notificationData = {
-      recipientId: userId,
-      senderId: systemSenderId,
-      title: 'Certificate Unlocked',
-      body: `You have successfully purchased the certificate for ${subcourse.subcourseName}. You can now download it!`,
-      type: 'certificate_unlocked',
-      data: {
-        subcourseId: subcourse._id,
-      },
-      createdAt: new Date(),
-    };
-    console.log('verifyAppleSubcourseCertificate: Preparing notification:', notificationData);
-
-    // Save and send notification
-    const notification = await NotificationService.createAndSendNotification(notificationData);
-    console.log('verifyAppleSubcourseCertificate: Notification created and sent:', { notificationId: notification._id });
-
-    // Emit event (assuming emitCertificateUnlocked or similar; adjust as needed)
-    if (io) {
-      console.log('verifyAppleSubcourseCertificate: Emitting certificate event to user:', userId);
-      // emitCertificateUnlocked(io, userId, { ... }); // Implement if needed
-    } else {
-      console.log('verifyAppleSubcourseCertificate: Socket.IO instance not found');
-    }
 
     console.log('verifyAppleSubcourseCertificate: Apple IAP verification and certificate purchase successful');
     return apiResponse(res, {
@@ -886,36 +855,6 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
     await certificatePayment.save();
     console.log('verifyAppleMainCourseCertificate: certificatePayment saved:', { certificatePaymentId: certificatePayment._id, paymentStatus: certificatePayment.paymentStatus });
 
-    // Use a placeholder ObjectId for system-generated notifications
-    const systemSenderId = new mongoose.Types.ObjectId();
-    console.log('verifyAppleMainCourseCertificate: Generated systemSenderId for notification:', systemSenderId);
-
-    // Create and send notification for successful certificate purchase
-    const notificationData = {
-      recipientId: userId,
-      senderId: systemSenderId,
-      title: 'Certificate Unlocked',
-      body: `You have successfully purchased the certificate for ${course.courseName}. You can now download it!`,
-      type: 'certificate_unlocked',
-      data: {
-        courseId: course._id,
-      },
-      createdAt: new Date(),
-    };
-    console.log('verifyAppleMainCourseCertificate: Preparing notification:', notificationData);
-
-    // Save and send notification
-    const notification = await NotificationService.createAndSendNotification(notificationData);
-    console.log('verifyAppleMainCourseCertificate: Notification created and sent:', { notificationId: notification._id });
-
-    // Emit event (assuming emitCertificateUnlocked or similar; adjust as needed)
-    if (io) {
-      console.log('verifyAppleMainCourseCertificate: Emitting certificate event to user:', userId);
-      // emitCertificateUnlocked(io, userId, { ... }); // Implement if needed
-    } else {
-      console.log('verifyAppleMainCourseCertificate: Socket.IO instance not found');
-    }
-
     console.log('verifyAppleMainCourseCertificate: Apple IAP verification and certificate purchase successful');
     return apiResponse(res, {
       success: true,
@@ -935,7 +874,6 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
     });
   }
 };
-
 // Download Subcourse Certificate
 exports.downloadCertificate = async (req, res) => {
   try {
