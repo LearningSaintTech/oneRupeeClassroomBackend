@@ -435,6 +435,7 @@ exports.getSubcourseById = async (req, res) => {
           price:{$first:'$price'},
           recordedlessonsPrice: { $first: '$recordedlessonsPrice' },
           recordedlessonsLink: { $first: '$recordedlessonsLink' },
+          appleProductId:{$first:'$appleProductId'},
           lessons: {
             $push: {
               lessonId: '$lessons._id',
@@ -467,6 +468,7 @@ exports.getSubcourseById = async (req, res) => {
           price:1,
           recordedlessonsPrice: 1,
           recordedlessonsLink: 1,
+          appleProductId:1,
           lessons: 1,
           isBestSeller: {
             $cond: {
@@ -1168,7 +1170,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
     // Fetch the subcourse with only subcourseName and certificateDescription
     const subcourse = await Subcourse.findById(
       subcourseId,
-      'subcourseName certificateDescription certificatePrice'
+      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId'
     );
 
     // Handle case where subcourse is not found
@@ -1190,6 +1192,8 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       subcourseName: subcourse.subcourseName,
       certificateDescription: subcourse.certificateDescription,
       certificatePrice: subcourse.certificatePrice,
+      appleCertificateProductId:subcourse.appleCertificateProductId,
+      appleRecordedProductId:subcourse.appleRecordedProductId,
       isPaymentDone,
     };
 
@@ -1250,7 +1254,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
     // Fetch the course with only courseName, certificateDescription, and CourseInternshipPrice
     const course = await Course.findById(
       courseId,
-      'courseName certificateDescription CourseInternshipPrice'
+      'courseName certificateDescription CourseInternshipPrice appleCertificateProductId'
     );
 
     // Handle case where course is not found
@@ -1280,6 +1284,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
       uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
       price: course.CourseInternshipPrice,
       certificatePrice: course.CourseInternshipPrice,
+      appleCertificateProductId:course.appleCertificateProductId,
       isPaymentDone,
     };
 

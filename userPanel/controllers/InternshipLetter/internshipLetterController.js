@@ -502,7 +502,8 @@ exports.checkInternshipStatus = async (req, res) => {
             data: {
                 isEnrolled: internshipLetter.paymentStatus === true,
                 uploadStatus: internshipLetter.uploadStatus,
-                internshipLetter:internshipLetter.internshipLetter
+                internshipLetter:internshipLetter.internshipLetter,
+                appleInternshipProductId:internshipLetter.appleInternshipProductId
             },
             statusCode: 200,
         });
