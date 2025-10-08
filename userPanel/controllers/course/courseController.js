@@ -167,7 +167,7 @@ exports.getPopularCourses = async (req, res) => {
       avgRating: subcourse.avgRating,
       totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
       price: subcourse.price,
-      isUpComingCourse: subcourse.isUpComingCourse
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     // Calculate total pages
@@ -270,7 +270,7 @@ exports.getNewestCourses = async (req, res) => {
       totalLessons: subcourse.totalLessons,
       avgRating: subcourse.avgRating,
       price: subcourse.price,
-      isUpComingCourse: subcourse.isUpComingCourse
+      isUpComingCourse:subcourse.isUpComingCourse
     }));
 
     // Calculate total pages
@@ -432,11 +432,11 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: { $first: '$totalDuration' },
           subCourseDescription: { $first: '$subCourseDescription' },
           totalLessons: { $first: '$totalLessons' },
-          price: { $first: '$price' },
+          price:{$first:'$price'},
           recordedlessonsPrice: { $first: '$recordedlessonsPrice' },
           recordedlessonsLink: { $first: '$recordedlessonsLink' },
-          appleProductId: { $first: '$appleProductId' },
-          appleRecordedProductId: { $first: '$appleRecordedProductId' },
+          appleProductId:{$first:'$appleProductId'},
+          appleRecordedProductId:{$first:'$appleRecordedProductId'},
           lessons: {
             $push: {
               lessonId: '$lessons._id',
@@ -466,11 +466,11 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: 1,
           subCourseDescription: 1,
           totalLessons: 1,
-          price: 1,
+          price:1,
           recordedlessonsPrice: 1,
           recordedlessonsLink: 1,
-          appleProductId: 1,
-          appleRecordedProductId: 1,
+          appleProductId:1,
+          appleRecordedProductId:1,
           lessons: 1,
           isBestSeller: {
             $cond: {
@@ -510,6 +510,92 @@ exports.getSubcourseById = async (req, res) => {
     return apiResponse(res, {
       success: false,
       message: `Failed to fetch subcourse: ${error.message}`,
+      statusCode: 500,
+    });
+  }
+};
+//get lesson by Id
+exports.getLessonById = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const lessonId = req.params.id;
+
+    // Validate lessonId and userId
+    if (!mongoose.Types.ObjectId.isValid(lessonId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Invalid lesson ID or user ID',
+        statusCode: 400,
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
+    // Find lesson
+    const lesson = await Lesson.findById(lessonId);
+    if (!lesson) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Lesson not found',
+        statusCode: 404,
+      });
+    }
+
+    // Check if user has purchased the subcourse associated with the lesson
+    if (!user.purchasedsubCourses.includes(lesson.subcourseId)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Access denied: Subcourse not purchased',
+        statusCode: 403,
+      });
+    }
+
+    // Get current date and time in IST
+    const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    const currentDateTime = new Date(now);
+
+    // Set lesson start and end times
+    const lessonDate = new Date(lesson.date);
+    lessonDate.setHours(parseInt(lesson.startTime.split(':')[0]), parseInt(lesson.startTime.split(':')[1]), 0, 0);
+    const lessonEndTime = new Date(lessonDate);
+    lessonEndTime.setHours(parseInt(lesson.endTime.split(':')[0]), parseInt(lesson.endTime.split(':')[1]), 0, 0);
+
+    // Determine live status
+    const isLive = currentDateTime >= lessonDate && currentDateTime <= lessonEndTime;
+
+    // Prepare response data
+    const responseData = {
+      introVideoUrl: lesson.introVideoUrl,
+      lessonName: lesson.lessonName,
+      classLink: lesson.classLink,
+      recordedVideoLink: lesson.recordedVideoLink,
+      date: lesson.date,
+      desc: lesson.description,
+      duration: lesson.duration,
+      startTime: lesson.startTime,
+      endTime: lesson.endTime,
+      LiveStatus: isLive,
+    };
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Lesson details retrieved successfully',
+      data: responseData,
+      statusCode: 200,
+    });
+  } catch (error) {
+    console.error('Error fetching lesson by ID:', error);
+    return apiResponse(res, {
+      success: false,
+      message: `Failed to fetch lesson: ${error.message}`,
       statusCode: 500,
     });
   }
@@ -847,7 +933,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
           price: 1,
           thumbnailImageUrl: 1,
           totalLessons: 1,
-          isUpComingCourse: 1,
+          isUpComingCourse:1,
           isLike: {
             $cond: {
               if: { $eq: [{ $size: '$favourite' }, 0] },
@@ -1108,8 +1194,8 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       subcourseName: subcourse.subcourseName,
       certificateDescription: subcourse.certificateDescription,
       certificatePrice: subcourse.certificatePrice,
-      appleCertificateProductId: subcourse.appleCertificateProductId,
-      appleRecordedProductId: subcourse.appleRecordedProductId,
+      appleCertificateProductId:subcourse.appleCertificateProductId,
+      appleRecordedProductId:subcourse.appleRecordedProductId,
       isPaymentDone,
     };
 
@@ -1200,7 +1286,7 @@ exports.getCourseNameAndDesc = async (req, res) => {
       uploadStatus: internshipLetter ? internshipLetter.uploadStatus : 'upload', // Default to 'upload' if no record found
       price: course.CourseInternshipPrice,
       certificatePrice: course.CourseInternshipPrice,
-      appleCertificateProductId: course.appleCertificateProductId,
+      appleCertificateProductId:course.appleCertificateProductId,
       isPaymentDone,
     };
 
