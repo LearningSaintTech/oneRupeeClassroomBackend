@@ -1023,20 +1023,20 @@ exports.progressBanner = async (req, res) => {
         console.log(`User found with purchasedsubCourses: ${user.purchasedsubCourses}`);
         recentSubcourse = await Subcourse.findOne(
           { _id: { $nin: user.purchasedsubCourses || [] } },
-          'subcourseName thumbnailImageUrl totalLessons'
+          'subcourseName thumbnailImageUrl totalLessons isUpComingCourse'
         ).sort({ createdAt: -1 });
       } else {
         console.log(`User not found for ID: ${userId}, fetching most recent subcourse...`);
         recentSubcourse = await Subcourse.findOne(
           {},
-          'subcourseName thumbnailImageUrl totalLessons'
+          'subcourseName thumbnailImageUrl totalLessons isUpComingCourse'
         ).sort({ createdAt: -1 });
       }
     } else {
       console.log(`No userId provided, fetching most recent subcourse...`);
       recentSubcourse = await Subcourse.findOne(
         {},
-        'subcourseName thumbnailImageUrl totalLessons'
+        'subcourseName thumbnailImageUrl totalLessons isUpComingCourse'
       ).sort({ createdAt: -1 });
     }
 
@@ -1058,7 +1058,7 @@ exports.progressBanner = async (req, res) => {
       )
         .populate({
           path: 'subcourseId',
-          select: 'subcourseName thumbnailImageUrl totalLessons'
+          select: 'subcourseName thumbnailImageUrl totalLessons isUpComingCourse'
         })
         .sort({ paymentDate: -1 });
 
@@ -1085,6 +1085,7 @@ exports.progressBanner = async (req, res) => {
           subcourseName: recentPurchasedSubcourse.subcourseId.subcourseName,
           thumbnailImageUrl: recentPurchasedSubcourse.subcourseId.thumbnailImageUrl,
           totalLessons: recentPurchasedSubcourse.subcourseId.totalLessons,
+          isUpComingCourse: recentPurchasedSubcourse.subcourseId.isUpComingCourse,
           progress: recentPurchasedSubcourse.progress
         };
       } else {
@@ -1128,7 +1129,6 @@ exports.progressBanner = async (req, res) => {
     });
   }
 };
-
 
 
 // Get Subcourse Name and Certificate Description
