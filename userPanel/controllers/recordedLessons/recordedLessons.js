@@ -287,7 +287,6 @@ exports.verifyRecordedLessonsPayment = async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId } = req.body;
     const userId = req.userId;
-    const io = req.app.get('io');
 
     console.log('verifyRecordedLessonsPayment: Starting with inputs:', { userId, razorpayOrderId, razorpayPaymentId, subcourseId });
 
@@ -369,37 +368,6 @@ exports.verifyRecordedLessonsPayment = async (req, res) => {
     await recordedLesson.save();
     console.log('verifyRecordedLessonsPayment: RecordedLesson saved:', { recordedLessonId: recordedLesson._id, paymentStatus: recordedLesson.paymentStatus });
 
-    // Use a placeholder ObjectId for system-generated notifications
-    const systemSenderId = new mongoose.Types.ObjectId();
-    console.log('verifyRecordedLessonsPayment: Generated systemSenderId for notification:', systemSenderId);
-
-    // Create and send notification for successful purchase
-    const notificationData = {
-      recipientId: userId,
-      senderId: systemSenderId,
-      title: 'Recorded Lessons Unlocked',
-      body: `You have successfully purchased recorded lessons for ${subcourse.subcourseName}. Access them now!`,
-      type: 'recorded_lessons_unlocked',
-      data: {
-        subcourseId: subcourse._id,
-      },
-      createdAt: new Date(),
-    };
-    console.log('verifyRecordedLessonsPayment: Preparing notification:', notificationData);
-
-    // Save and send notification
-    const notification = await NotificationService.createAndSendNotification(notificationData);
-    console.log('verifyRecordedLessonsPayment: Notification created and sent:', { notificationId: notification._id });
-
-    // Emit event (assuming emitBuyRecordedLessons or similar; adjust as needed)
-    if (io) {
-      console.log('verifyRecordedLessonsPayment: Emitting recorded_lessons event to user:', userId);
-      // emitBuyRecordedLessons(io, userId, { id: notification._id, ... }); // Implement if needed
-    } else {
-      console.log('verifyRecordedLessonsPayment: Socket.IO instance not found');
-    }
-
-    console.log('verifyRecordedLessonsPayment: Payment verification successful');
     return apiResponse(res, {
       success: true,
       message: 'Payment verified successfully',
