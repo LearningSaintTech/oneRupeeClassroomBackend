@@ -466,7 +466,6 @@ exports.verifyCertificatePayment = async (req, res) => {
   }
 };
 
-// Verify Apple Subcourse Certificate Payment
 exports.verifyAppleSubcourseCertificate = async (req, res) => {
   try {
     const { signedTransaction, subcourseId } = req.body;
@@ -577,14 +576,70 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
         });
       }
       
-      // Get the latest transaction (most recent purchase)
-      const latestTransaction = receiptInfo[receiptInfo.length - 1];
+      // Find the transaction that matches the expected certificate product ID
+      const expectedProductId = subcourse.appleCertificateProductId || 'com.yourapp.cert.dummy.subcourse';
+      console.log('verifyAppleSubcourseCertificate: Looking for product ID:', expectedProductId);
+      console.log('verifyAppleSubcourseCertificate: Available transactions:', receiptInfo.map(t => ({ product_id: t.product_id, transaction_id: t.transaction_id })));
+      
+      // Find ALL certificate transactions and get the LATEST one
+      const certificateTransactions = receiptInfo.filter(transaction => 
+        transaction.product_id === expectedProductId
+      );
+      
+      console.log('verifyAppleSubcourseCertificate: Found certificate transactions:', certificateTransactions.length);
+      
+      if (certificateTransactions.length === 0) {
+        console.log('verifyAppleSubcourseCertificate: No certificate transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Certificate purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+      
+      // Get the LATEST certificate transaction (highest transaction ID)
+      const certificateTransaction = certificateTransactions.reduce((latest, current) => {
+        return parseInt(current.transaction_id) > parseInt(latest.transaction_id) ? current : latest;
+      });
+      
+      if (!certificateTransaction) {
+        console.log('verifyAppleSubcourseCertificate: No certificate transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Certificate purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+      
+      console.log('verifyAppleSubcourseCertificate: Found certificate transaction:', { 
+        transaction_id: certificateTransaction.transaction_id, 
+        product_id: certificateTransaction.product_id 
+      });
+      
+      // Check if this specific transaction has already been processed
+      const existingPayment = await CertificatePayment.findOne({
+        appleTransactionId: certificateTransaction.transaction_id
+      });
+      
+      if (existingPayment) {
+        console.log('verifyAppleSubcourseCertificate: Transaction already processed:', { 
+          transactionId: certificateTransaction.transaction_id,
+          existingPaymentId: existingPayment._id 
+        });
+        return apiResponse(res, {
+          success: true,
+          message: 'Certificate purchase already verified',
+          data: { purchased: true },
+          statusCode: 200,
+        });
+      }
+      
       payload = {
-        transactionId: latestTransaction.transaction_id,
-        productId: latestTransaction.product_id,
-        purchaseDate: parseInt(latestTransaction.purchase_date_ms),
-        originalTransactionId: latestTransaction.original_transaction_id,
-        webOrderLineItemId: latestTransaction.web_order_line_item_id
+        transactionId: certificateTransaction.transaction_id,
+        productId: certificateTransaction.product_id,
+        purchaseDate: parseInt(certificateTransaction.purchase_date_ms),
+        originalTransactionId: certificateTransaction.original_transaction_id,
+        webOrderLineItemId: certificateTransaction.web_order_line_item_id
       };
       
       console.log('verifyAppleSubcourseCertificate: Apple verification successful:', { 
@@ -612,16 +667,7 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
       });
     }
 
-    // Check if transaction already processed
-    if (certificatePayment && certificatePayment.appleTransactionId === payload.transactionId) {
-      console.log('verifyAppleSubcourseCertificate: Transaction already processed:', { transactionId: payload.transactionId });
-      return apiResponse(res, {
-        success: true,
-        message: 'Certificate purchase already verified',
-        data: { purchased: true },
-        statusCode: 200,
-      });
-    }
+    // Note: Duplicate check moved to after transaction extraction to check the correct transaction ID
 
     // Create or update certificatePayment with Apple IAP details
     console.log('verifyAppleSubcourseCertificate: Updating/creating certificatePayment:', { userId, subcourseId });
@@ -782,14 +828,42 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
         });
       }
       
-      // Get the latest transaction (most recent purchase)
-      const latestTransaction = receiptInfo[receiptInfo.length - 1];
+      // Find ALL course certificate transactions and get the LATEST one
+      const expectedProductId = course.appleCertificateProductId || 'com.yourapp.cert.dummy.maincourse';
+      console.log('verifyAppleMainCourseCertificate: Looking for product ID:', expectedProductId);
+      console.log('verifyAppleMainCourseCertificate: Available transactions:', receiptInfo.map(t => ({ product_id: t.product_id, transaction_id: t.transaction_id })));
+
+      const certificateTransactions = receiptInfo.filter(transaction =>
+        transaction.product_id === expectedProductId
+      );
+
+      console.log('verifyAppleMainCourseCertificate: Found certificate transactions:', certificateTransactions.length);
+
+      if (certificateTransactions.length === 0) {
+        console.log('verifyAppleMainCourseCertificate: No certificate transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Certificate purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+
+      // Get the LATEST certificate transaction (highest transaction ID)
+      const latestCertificateTransaction = certificateTransactions.reduce((latest, current) => {
+        return parseInt(current.transaction_id) > parseInt(latest.transaction_id) ? current : latest;
+      });
+
+      console.log('verifyAppleMainCourseCertificate: Found latest certificate transaction:', {
+        transaction_id: latestCertificateTransaction.transaction_id,
+        product_id: latestCertificateTransaction.product_id
+      });
+
       payload = {
-        transactionId: latestTransaction.transaction_id,
-        productId: latestTransaction.product_id,
-        purchaseDate: parseInt(latestTransaction.purchase_date_ms),
-        originalTransactionId: latestTransaction.original_transaction_id,
-        webOrderLineItemId: latestTransaction.web_order_line_item_id
+        transactionId: latestCertificateTransaction.transaction_id,
+        productId: latestCertificateTransaction.product_id,
+        purchaseDate: parseInt(latestCertificateTransaction.purchase_date_ms),
+        originalTransactionId: latestCertificateTransaction.original_transaction_id,
+        webOrderLineItemId: latestCertificateTransaction.web_order_line_item_id
       };
       
       console.log('verifyAppleMainCourseCertificate: Apple verification successful:', { 
@@ -806,24 +880,23 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
       });
     }
 
-    // Check if productId matches course's appleCertificateProductId
-    const expectedProductId = course.appleCertificateProductId || 'com.yourapp.cert.dummy.maincourse';
-    if (payload.productId !== expectedProductId) {
-      console.log('verifyAppleMainCourseCertificate: Product mismatch:', { expected: expectedProductId, actual: payload.productId });
-      return apiResponse(res, {
-        success: false,
-        message: 'Product mismatch',
-        statusCode: 400,
-      });
-    }
+    // Product ID validation is already done during transaction filtering above
+    console.log('verifyAppleMainCourseCertificate: Product ID validated during transaction filtering:', payload.productId);
 
-    // Check if transaction already processed
-    if (certificatePayment && certificatePayment.appleTransactionId === payload.transactionId) {
-      console.log('verifyAppleMainCourseCertificate: Transaction already processed:', { transactionId: payload.transactionId });
+    // Check if this specific transaction has already been processed
+    const existingPayment = await CertificatePayment.findOne({
+      appleTransactionId: payload.transactionId
+    });
+
+    if (existingPayment) {
+      console.log('verifyAppleMainCourseCertificate: Transaction already processed:', {
+        transactionId: payload.transactionId,
+        existingPaymentId: existingPayment._id
+      });
       return apiResponse(res, {
         success: true,
         message: 'Certificate purchase already verified',
-        data: { purchased: true },
+        data: { purchased: true, courseId, courseName: course.courseName },
         statusCode: 200,
       });
     }

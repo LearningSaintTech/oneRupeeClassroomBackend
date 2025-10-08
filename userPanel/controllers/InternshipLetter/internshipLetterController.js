@@ -461,61 +461,72 @@ exports.updatePaymentStatus = async (req, res) => {
 //check internship-request status
 
 exports.checkInternshipStatus = async (req, res) => {
-    try {
-        const userId = req.userId;
-        const { courseId } = req.params; // Extract courseId from URL params
+  try {
+      const userId = req.userId;
+      const { courseId } = req.params; // Extract courseId from URL params
 
-        // Validate courseId
-        if (!mongoose.Types.ObjectId.isValid(courseId)) {
-            return apiResponse(res, {
-                success: false,
-                message: 'Invalid course ID',
-                statusCode: 400,
-            });
-        }
+      // Validate courseId
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+          return apiResponse(res, {
+              success: false,
+              message: 'Invalid course ID',
+              statusCode: 400,
+          });
+      }
 
-        // Check if internship letter request exists for the user and course
-        const internshipLetter = await InternshipLetter.findOne({
-            userId,
-            courseId,
-            paymentStatus:true
-        });
+      // Check if internship letter request exists for the user and course
+      const internshipLetter = await InternshipLetter.findOne({
+          userId,
+          courseId,
+          paymentStatus: true
+      });
 
-        // If no internship letter request exists, return false for isEnrolled and null for uploadStatus
-        if (!internshipLetter) {
-            return apiResponse(res, {
-                success: true,
-                message: 'No internship letter request found',
-                data: {
-                    isEnrolled: false,
-                    uploadStatus: null,
-                    internshipLetter:""
-                },
-                statusCode: 200,
-            });
-        }
+      // Fetch course to get appleInternshipProductId
+      const course = await Course.findById(courseId).select('appleInternshipProductId');
+      if (!course) {
+          return apiResponse(res, {
+              success: false,
+              message: 'Course not found',
+              statusCode: 404,
+          });
+      }
 
-        // Return isEnrolled based on paymentStatus and include uploadStatus
-        return apiResponse(res, {
-            success: true,
-            message: 'Internship status checked successfully',
-            data: {
-                isEnrolled: internshipLetter.paymentStatus === true,
-                uploadStatus: internshipLetter.uploadStatus,
-                internshipLetter:internshipLetter.internshipLetter,
-                appleInternshipProductId:internshipLetter.appleInternshipProductId
-            },
-            statusCode: 200,
-        });
+      // If no internship letter request exists, return response with course's appleInternshipProductId
+      if (!internshipLetter) {
+          return apiResponse(res, {
+              success: true,
+              message: 'No internship letter request found',
+              data: {
+                  isEnrolled: false,
+                  uploadStatus: null,
+                  internshipLetter: "",
+                  appleInternshipProductId: course.appleInternshipProductId || null
+              },
+              statusCode: 200,
+          });
+      }
 
-    } catch (error) {
-        console.error('Error checking internship status:', error.message);
-        return apiResponse(res, {
-            success: false,
-            message: 'Server error',
-            statusCode: 500,
-        });
-    }
+      // Return isEnrolled based on paymentStatus and include uploadStatus and course's appleInternshipProductId
+      return apiResponse(res, {
+          success: true,
+          message: 'Internship status checked successfully',
+          data: {
+              isEnrolled: internshipLetter.paymentStatus === true,
+              uploadStatus: internshipLetter.uploadStatus,
+              internshipLetter: internshipLetter.internshipLetter,
+              appleInternshipProductId: internshipLetter.appleInternshipProductId || course.appleInternshipProductId || null
+          },
+          statusCode: 200,
+      });
+
+  } catch (error) {
+      console.error('Error checking internship status:', error.message);
+      return apiResponse(res, {
+          success: false,
+          message: 'Server error',
+          statusCode: 500,
+      });
+  }
 };
 
 // Verify Apple Internship Letter Payment
@@ -574,7 +585,7 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
 
     // Check if course is completed
     const userMainCourse = await UsermainCourse.findOne({ userId, courseId, isCompleted: true });
-    if (!userMainCourse || userMainCourse.status !== 'Course Completed') {
+    if (!userMainCourse) {
       console.log('verifyAppleInternshipLetter: Course not completed:', { userId, courseId });
       return apiResponse(res, {
         success: false,
@@ -630,20 +641,56 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
         });
       }
       
-      // Get the latest transaction (most recent purchase)
-      const latestTransaction = receiptInfo[receiptInfo.length - 1];
+      // Find the transaction that matches the expected internship product ID
+      const expectedProductId = course.appleInternshipProductId || 'com.yourapp.intern.dummy';
+      console.log('verifyAppleInternshipLetter: Looking for product ID:', expectedProductId);
+      console.log('verifyAppleInternshipLetter: Available transactions:', receiptInfo.map(t => ({ product_id: t.product_id, transaction_id: t.transaction_id })));
+      
+      // Find ALL internship transactions and get the LATEST one
+      const internshipTransactions = receiptInfo.filter(transaction => 
+        transaction.product_id === expectedProductId
+      );
+      
+      console.log('verifyAppleInternshipLetter: Found internship transactions:', internshipTransactions.length);
+      
+      if (internshipTransactions.length === 0) {
+        console.log('verifyAppleInternshipLetter: No internship transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Internship purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+      
+      // Get the LATEST internship transaction (highest transaction ID)
+      const internshipTransaction = internshipTransactions.reduce((latest, current) => {
+        return parseInt(current.transaction_id) > parseInt(latest.transaction_id) ? current : latest;
+      });
+      
+      if (!internshipTransaction) {
+        console.log('verifyAppleInternshipLetter: No internship transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Internship purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+      
       payload = {
-        transactionId: latestTransaction.transaction_id,
-        productId: latestTransaction.product_id,
-        purchaseDate: parseInt(latestTransaction.purchase_date_ms),
-        originalTransactionId: latestTransaction.original_transaction_id,
-        webOrderLineItemId: latestTransaction.web_order_line_item_id
+        transactionId: internshipTransaction.transaction_id,
+        productId: internshipTransaction.product_id,
+        purchaseDate: parseInt(internshipTransaction.purchase_date_ms),
+        originalTransactionId: internshipTransaction.original_transaction_id,
+        webOrderLineItemId: internshipTransaction.web_order_line_item_id
       };
       
       console.log('verifyAppleInternshipLetter: Apple verification successful:', { 
         transactionId: payload.transactionId, 
         productId: payload.productId,
-        purchaseDate: new Date(payload.purchaseDate).toISOString()
+        expectedProductId: expectedProductId,
+        purchaseDate: new Date(payload.purchaseDate).toISOString(),
+        totalTransactionsInReceipt: receiptInfo.length,
+        internshipTransactionsFound: internshipTransactions.length
       });
     } else {
       console.log('verifyAppleInternshipLetter: Missing signedTransaction for real verification');
@@ -654,16 +701,8 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
       });
     }
 
-    // Check if productId matches course's appleInternshipProductId
-    const expectedProductId = course.appleInternshipProductId || 'com.yourapp.intern.dummy';
-    if (payload.productId !== expectedProductId) {
-      console.log('verifyAppleInternshipLetter: Product mismatch:', { expected: expectedProductId, actual: payload.productId });
-      return apiResponse(res, {
-        success: false,
-        message: 'Product mismatch',
-        statusCode: 400,
-      });
-    }
+    // Product ID validation is now handled during transaction filtering above
+    // No need for additional product mismatch check since we already filtered for the correct product
 
     // Check if transaction already processed
     if (internshipLetter && internshipLetter.appleTransactionId === payload.transactionId) {

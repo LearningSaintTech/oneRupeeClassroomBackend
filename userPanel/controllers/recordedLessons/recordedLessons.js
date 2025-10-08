@@ -423,7 +423,7 @@ exports.verifyAppleRecordedLessons = async (req, res) => {
   try {
     const { signedTransaction, subcourseId } = req.body;
     const userId = req.userId;
-    const io = req.app.get('io');
+    
 
     console.log('verifyAppleRecordedLessons: Starting with inputs:', { userId, subcourseId });
 
@@ -519,8 +519,40 @@ exports.verifyAppleRecordedLessons = async (req, res) => {
         });
       }
       
-      // Get the latest transaction (most recent purchase)
-      const latestTransaction = receiptInfo[receiptInfo.length - 1];
+      // Filter for recorded lessons transactions only
+      const expectedProductId = subcourse.appleRecordedProductId || 'com.yourapp.rec.dummy';
+      console.log('verifyAppleRecordedLessons: Looking for product ID:', expectedProductId);
+      console.log('verifyAppleRecordedLessons: Available transactions:', receiptInfo.map(t => ({ product_id: t.product_id, transaction_id: t.transaction_id })));
+
+      const recordedLessonsTransactions = receiptInfo.filter(transaction =>
+        transaction.product_id === expectedProductId
+      );
+
+      console.log('verifyAppleRecordedLessons: Found recorded lessons transactions:', recordedLessonsTransactions.length);
+
+      if (recordedLessonsTransactions.length === 0) {
+        console.log('verifyAppleRecordedLessons: No recorded lessons transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Recorded lessons purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+
+      // Get the latest recorded lessons transaction
+      const latestTransaction = recordedLessonsTransactions.reduce((latest, current) => {
+        return parseInt(current.transaction_id) > parseInt(latest.transaction_id) ? current : latest;
+      });
+
+      if (!latestTransaction) {
+        console.log('verifyAppleRecordedLessons: No recorded lessons transaction found in receipt');
+        return apiResponse(res, {
+          success: false,
+          message: 'Recorded lessons purchase not found in receipt',
+          statusCode: 400,
+        });
+      }
+
       payload = {
         transactionId: latestTransaction.transaction_id,
         productId: latestTransaction.product_id,
@@ -543,16 +575,8 @@ exports.verifyAppleRecordedLessons = async (req, res) => {
       });
     }
 
-    // Check if productId matches subcourse's appleRecordedProductId
-    const expectedProductId = subcourse.appleRecordedProductId || 'com.yourapp.rec.dummy';
-    if (payload.productId !== expectedProductId) {
-      console.log('verifyAppleRecordedLessons: Product mismatch:', { expected: expectedProductId, actual: payload.productId });
-      return apiResponse(res, {
-        success: false,
-        message: 'Product mismatch',
-        statusCode: 400,
-      });
-    }
+    // Product ID validation is now handled during transaction filtering above
+    // No need for additional product mismatch check since we already filtered for the correct product
 
     // Check if transaction already processed
     if (existingRecordedLesson && existingRecordedLesson.appleTransactionId === payload.transactionId) {
@@ -599,30 +623,7 @@ exports.verifyAppleRecordedLessons = async (req, res) => {
     console.log('verifyAppleRecordedLessons: Generated systemSenderId for notification:', systemSenderId);
 
     // Create and send notification for successful purchase
-    const notificationData = {
-      recipientId: userId,
-      senderId: systemSenderId,
-      title: 'Recorded Lessons Unlocked',
-      body: `You have successfully purchased recorded lessons for ${subcourse.subcourseName}. Access them now!`,
-      type: 'recorded_lessons_unlocked',
-      data: {
-        subcourseId: subcourse._id,
-      },
-      createdAt: new Date(),
-    };
-    console.log('verifyAppleRecordedLessons: Preparing notification:', notificationData);
-
-    // Save and send notification
-    const notification = await NotificationService.createAndSendNotification(notificationData);
-    console.log('verifyAppleRecordedLessons: Notification created and sent:', { notificationId: notification._id });
-
-    // Emit event (assuming emitBuyRecordedLessons or similar; adjust as needed)
-    if (io) {
-      console.log('verifyAppleRecordedLessons: Emitting recorded_lessons event to user:', userId);
-      // emitBuyRecordedLessons(io, userId, { id: notification._id, ... }); // Implement if needed
-    } else {
-      console.log('verifyAppleRecordedLessons: Socket.IO instance not found');
-    }
+   
 
     console.log('verifyAppleRecordedLessons: Apple IAP verification successful');
     return apiResponse(res, {
