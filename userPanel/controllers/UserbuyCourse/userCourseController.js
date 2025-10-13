@@ -144,12 +144,12 @@ function getAppleErrorDescription(statusCode) {
   return errorCodes[statusCode] || `Unknown error code: ${statusCode}`;
 }
 
-// Apple Server-to-Server Receipt Verification
-async function verifyAppleReceiptWithServer(receiptData, isSandbox = true) {
+// Apple Server-to-Server Receipt Verification with Environment Detection
+async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
   try {
     console.log("🔍 [Apple Server Verification] Starting server verification");
     console.log("🔍 [Apple Server Verification] Receipt length:", receiptData.length);
-    console.log("🔍 [Apple Server Verification] Environment:", isSandbox ? 'Sandbox' : 'Production');
+    console.log("🔍 [Apple Server Verification] Initial Environment:", isSandbox ? 'Sandbox' : 'Production');
     
     const sharedSecret = process.env.APPLE_SHARED_SECRET;
     console.log("🔍 [Apple Server Verification] Loaded APPLE_SHARED_SECRET from environment:", sharedSecret || 'Not set');
@@ -162,7 +162,8 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = true) {
       };
     }
 
-    const url = isSandbox 
+    // First attempt with the specified environment
+    let url = isSandbox 
       ? 'https://sandbox.itunes.apple.com/verifyReceipt'
       : 'https://buy.itunes.apple.com/verifyReceipt';
     
@@ -178,7 +179,7 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = true) {
       'exclude-old-transactions': requestBody['exclude-old-transactions']
     });
     
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -186,8 +187,37 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = true) {
       body: JSON.stringify(requestBody)
     });
     
-    const result = await response.json();
+    let result = await response.json();
     console.log("🔍 [Apple Server Verification] Apple response:", JSON.stringify(result, null, 2));
+    
+    // Handle environment mismatch errors
+    if (result.status === 21007) {
+      // Receipt is from sandbox but sent to production - retry with sandbox
+      console.log("🔄 [Apple Server Verification] Environment mismatch detected (21007) - retrying with sandbox");
+      url = 'https://sandbox.itunes.apple.com/verifyReceipt';
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+      result = await response.json();
+      console.log("🔍 [Apple Server Verification] Retry response:", JSON.stringify(result, null, 2));
+    } else if (result.status === 21008) {
+      // Receipt is from production but sent to sandbox - retry with production
+      console.log("🔄 [Apple Server Verification] Environment mismatch detected (21008) - retrying with production");
+      url = 'https://buy.itunes.apple.com/verifyReceipt';
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+      result = await response.json();
+      console.log("🔍 [Apple Server Verification] Retry response:", JSON.stringify(result, null, 2));
+    }
     
     if (result.status === 0) {
       console.log("✅ [Apple Server Verification] Receipt verified successfully");
@@ -624,7 +654,7 @@ exports.verifyApplePurchase = async (req, res) => {
     } else if (signedTransaction) {
       // Verify transaction using Apple's server-to-server verification
       console.log('verifyApplePurchase: Verifying receipt with Apple servers');
-      const verificationResult = await verifyAppleReceiptWithServer(signedTransaction, true); // true for sandbox
+      const verificationResult = await verifyAppleReceiptWithServer(signedTransaction, false); // false for production (with auto-retry)
       
       if (!verificationResult.success) {
         console.log('verifyApplePurchase: Apple verification failed:', verificationResult.error);
