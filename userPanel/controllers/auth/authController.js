@@ -178,7 +178,7 @@ exports.verifyOTP = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, mobileNumber: user.mobileNumber },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     return apiResponse(res, {
@@ -446,7 +446,7 @@ exports.firebaseVerifyOTP = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, mobileNumber: user.mobileNumber },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
     console.log('firebaseVerifyOTP: JWT generated', { token: token });
 

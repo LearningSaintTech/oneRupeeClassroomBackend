@@ -292,7 +292,7 @@ const registerWith2Factor = async (req, res) => {
           fullName: newUser.fullName 
         },
         process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: '30d' }
       );
 
       return apiResponse(res, {
@@ -438,7 +438,7 @@ const verifyOTPWith2Factor = async (req, res) => {
             fullName: user.fullName 
           },
           process.env.JWT_SECRET,
-          { expiresIn: '7d' }
+          { expiresIn: '30d' }
         );
 
         return apiResponse(res, {
@@ -504,7 +504,7 @@ const verifyOTPWith2Factor = async (req, res) => {
               fullName: user.fullName 
             },
             process.env.JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '30d' }
           );
 
           return apiResponse(res, {
