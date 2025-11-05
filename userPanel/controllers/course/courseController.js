@@ -1176,7 +1176,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       subcourseId,
       paymentStatus: true,
     });
-    const isCertificatePaid = !!certificatePayment;
+    const isPaymentDone = !!certificatePayment;
 
     // Check Internship Letter Status
     const internshipLetter = await InternshipLetter.findOne({
@@ -1194,7 +1194,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       certificatePrice: subcourse.certificatePrice,
       appleCertificateProductId: subcourse.appleCertificateProductId,
       appleRecordedProductId: subcourse.appleRecordedProductId,
-      isCertificatePaid,
+      isPaymentDone,
 
       // === INTERNSHIP LETTER FIELDS ===
       internshipLetterPrice: subcourse.internshipLetterPrice || 0,
