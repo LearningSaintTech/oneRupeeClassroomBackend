@@ -12,10 +12,9 @@ exports.saveFCMToken = async (req, res) => {
 
   try {
     const { fcmToken, deviceId } = req.body;
-    const userId = req.userId; // From authMiddleware
+    const userId = req.userId;
 
     if (!fcmToken || !deviceId) {
-      console.log('🔔 [saveFCMToken] Missing fcmToken or deviceId');
       return apiResponse(res, {
         success: false,
         message: 'FCM token and device ID are required',
@@ -23,37 +22,68 @@ exports.saveFCMToken = async (req, res) => {
       });
     }
 
-    // Find or create user document and add token to the tokens array
-    const result = await FCMToken.findOneAndUpdate(
-      { userId },
-      { 
-        $addToSet: { 
-          tokens: { 
-            fcmToken, 
-            deviceId, 
-            isActive: true, 
-            lastSeen: new Date() 
-          }
-        }
+    const now = new Date();
+
+    // Step 1: Try to update existing token (same fcmToken + deviceId)
+    const updated = await FCMToken.updateOne(
+      {
+        userId,
+        "tokens.fcmToken": fcmToken,
+        "tokens.deviceId": deviceId,
       },
-      { 
-        upsert: true, 
-        new: true,
-        runValidators: true // Ensure validation is applied during upsert
+      {
+        $set: {
+          "tokens.$.isActive": true,
+          "tokens.$.lastSeen": now,
+        },
       }
     );
 
-    console.log('🔔 [saveFCMToken] FCM token saved successfully:', {
+    if (updated.modifiedCount > 0) {
+      // Token already existed → just updated
+      const doc = await FCMToken.findOne({ userId });
+      console.log('🔔 [saveFCMToken] Token updated (already exists)', {
+        userId,
+        fcmToken,
+        tokenCount: doc.tokens.length,
+      });
+
+      return apiResponse(res, {
+        success: true,
+        message: 'FCM token already exists – updated lastSeen',
+        data: { tokenCount: doc.tokens.length, wasAdded: false },
+      });
+    }
+
+    // Step 2: No match → add new token
+    const result = await FCMToken.findOneAndUpdate(
+      { userId },
+      {
+        $addToSet: {
+          tokens: {
+            fcmToken,
+            deviceId,
+            isActive: true,
+            lastSeen: now,
+          },
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+
+    console.log('🔔 [saveFCMToken] New token saved', {
       userId,
+      fcmToken,
       tokenCount: result.tokens.length,
-      lastAddedToken: fcmToken,
     });
 
     return apiResponse(res, {
       success: true,
       message: 'FCM token saved successfully',
-      statusCode: 200,
-      data: { tokenCount: result.tokens.length }
+      data: { tokenCount: result.tokens.length, wasAdded: true },
     });
   } catch (error) {
     console.error('🔔 [saveFCMToken] Error:', error);
@@ -64,7 +94,6 @@ exports.saveFCMToken = async (req, res) => {
     });
   }
 };
-
 // Get user notifications
 exports.getNotifications = async (req, res) => {
   console.log('🔔 [getNotifications] Request received:', {
