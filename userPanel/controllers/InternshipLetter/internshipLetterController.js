@@ -442,72 +442,72 @@ exports.updatePaymentStatus = async (req, res) => {
 
 //check internship-request status
 
+// check internship-request status for subcourseId
 exports.checkInternshipStatus = async (req, res) => {
   try {
-      const userId = req.userId;
-      const { courseId } = req.params; // Extract courseId from URL params
+    const userId = req.userId;
+    const { subcourseId } = req.params; // Extract subcourseId from URL params
 
-      // Validate courseId
-      if (!mongoose.Types.ObjectId.isValid(courseId)) {
-          return apiResponse(res, {
-              success: false,
-              message: 'Invalid course ID',
-              statusCode: 400,
-          });
-      }
-
-      // Check if internship letter request exists for the user and course
-      const internshipLetter = await InternshipLetter.findOne({
-          userId,
-          courseId,
-          paymentStatus: true
-      });
-
-      // Fetch course to get appleInternshipProductId
-      const course = await Course.findById(courseId).select('appleInternshipProductId');
-      if (!course) {
-          return apiResponse(res, {
-              success: false,
-              message: 'Course not found',
-              statusCode: 404,
-          });
-      }
-
-      // If no internship letter request exists, return response with course's appleInternshipProductId
-      if (!internshipLetter) {
-          return apiResponse(res, {
-              success: true,
-              message: 'No internship letter request found',
-              data: {
-                  isEnrolled: false,
-                  uploadStatus: null,
-                  internshipLetter: "",
-                  appleInternshipProductId: course.appleInternshipProductId || null
-              },
-              statusCode: 200,
-          });
-      }
-
-      // Return isEnrolled based on paymentStatus and include uploadStatus and course's appleInternshipProductId
+    // Validate subcourseId
+    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
       return apiResponse(res, {
-          success: true,
-          message: 'Internship status checked successfully',
-          data: {
-              isEnrolled: internshipLetter.paymentStatus === true,
-              uploadStatus: internshipLetter.uploadStatus,
-              internshipLetter: internshipLetter.internshipLetter,
-              appleInternshipProductId: internshipLetter.appleInternshipProductId || course.appleInternshipProductId || null
-          },
-          statusCode: 200,
+        success: false,
+        message: 'Invalid subcourse ID',
+        statusCode: 400,
       });
+    }
 
+    // Check if internship letter request exists for the user and subcourse
+    const internshipLetter = await InternshipLetter.findOne({
+      userId,
+      subcourseId,
+      paymentStatus: true,
+    });
+
+    // Fetch subcourse to get appleInternshipProductId (if needed)
+    const subcourse = await Subcourse.findById(subcourseId).select('appleInternshipProductId');
+    if (!subcourse) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Subcourse not found',
+        statusCode: 404,
+      });
+    }
+
+    // If no internship letter request exists
+    if (!internshipLetter) {
+      return apiResponse(res, {
+        success: true,
+        message: 'No internship letter request found',
+        data: {
+          isEnrolled: false,
+          uploadStatus: null,
+          internshipLetter: null,
+          appleInternshipProductId: subcourse.appleInternshipProductId || null,
+        },
+        statusCode: 200,
+      });
+    }
+
+    // Return status if paid
+    return apiResponse(res, {
+      success: true,
+      message: 'Internship status checked successfully',
+      data: {
+        isEnrolled: internshipLetter.paymentStatus === true,
+        uploadStatus: internshipLetter.uploadStatus || 'upload',
+        internshipLetter: internshipLetter.internshipLetter || null,
+        appleInternshipProductId: internshipLetter.appleInternshipProductId || subcourse.appleInternshipProductId || null,
+      },
+      statusCode: 200,
+    });
   } catch (error) {
-      console.error('Error checking internship status:', error.message);
-      return apiResponse(res, {
-          success: false,
-          message: 'Server error',
-          statusCode: 500,
-      });
+    console.error('Error checking internship status:', error.message);
+    return apiResponse(res, {
+      success: false,
+      message: 'Server error',
+      statusCode: 500,
+    });
   }
 };
 

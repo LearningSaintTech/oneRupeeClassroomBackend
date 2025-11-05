@@ -7,7 +7,7 @@ const {verifyToken} = require('../../middlewares/authMiddleware');
 router.post('/request-InternshipLetter', verifyToken, requestInternshipLetter);
 router.post('/verify-payment', verifyToken, updatePaymentStatus);
 
-router.get('/check-internshipStatus/:courseId', verifyToken, checkInternshipStatus);
+router.get('/check-internshipStatus/:subcourseId', verifyToken, checkInternshipStatus);
 
 
 router.post('/verify-apple', verifyToken, verifyAppleInternshipLetter);
