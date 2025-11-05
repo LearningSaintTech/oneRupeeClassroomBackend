@@ -28,6 +28,7 @@ const promoRoutes = require("./Promo/routes/promoRoutes");
 const getAllRatings = require("./adminPanel/routes/ratingsRoutes");
 const InternshipLetter = require("./userPanel/routes/internshipLetterRoutes");
 const uploadInternshipLetter = require("./adminPanel/routes/uploadInternshipLetterRoutes");
+const paymentRoutes = require("./adminPanel/routes/paymentRoutes");
 const NotificationService = require('./Notification/controller/notificationServiceController');
 const notificationRoutes = require("./Notification/routes/notificationRoutes");
 const verifyemailRoutes = require("./userPanel/routes/verifyEmailRoutes");
@@ -137,6 +138,7 @@ app.use("/api/admin/profile", adminProfileRoutes);
 app.use("/api/admin/users", totalusersRoutes);
 app.use("/api/admin/ratings", getAllRatings);
 app.use("/api/admin/upload", uploadInternshipLetter);
+app.use("/api/admin/payments", paymentRoutes);
 app.use("/api/promo", promoRoutes);
 
 // Start server
