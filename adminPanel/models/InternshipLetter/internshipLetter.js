@@ -6,7 +6,7 @@ const internshipLetterSchema = new mongoose.Schema({
         ref: "User",
         required: true,
     },
-    courseId: {
+    subcourseId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "course",
         required: true,

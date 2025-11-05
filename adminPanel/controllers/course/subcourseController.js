@@ -66,6 +66,7 @@ exports.createSubcourse = async (req, res) => {
             certificatePrice,
             certificateDescription,
             totalLessons,
+            internshipLetterPrice,
             totalDuration,
             isUpComingCourse,
             appleProductId
@@ -129,6 +130,7 @@ exports.createSubcourse = async (req, res) => {
             certificatePrice,
             certificateDescription,
             introVideoUrl,
+            internshipLetterPrice,
             totalLessons,
             totalDuration,
             thumbnailImageUrl: thumbnailUrl,
@@ -235,6 +237,7 @@ exports.updateSubcourse = async (req, res) => {
             certificateDescription,
             totalLessons,
             isUpComingCourse,
+            internshipLetterPrice,
             appleProductId
         } = req.body;
 
@@ -296,6 +299,7 @@ exports.updateSubcourse = async (req, res) => {
         if (certificatePrice) subcourse.certificatePrice = certificatePrice;
         if (certificateDescription) subcourse.certificateDescription = certificateDescription;
         if (totalLessons) subcourse.totalLessons = totalLessons;
+        if(internshipLetterPrice) subcourse.internshipLetterPrice = internshipLetterPrice;
         if (isUpComingCourse !== undefined) subcourse.isUpComingCourse = isUpComingCourse;
         if (appleProductId) subcourse.appleProductId = appleProductId
 
@@ -529,6 +533,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
             certificateDescription: subcourse.certificateDescription,
             introVideoUrl: subcourse.introVideoUrl,
             totalLessons: subcourse.totalLessons,
+            internshipLetterPrice:subcourse.internshipLetterPrice,
             totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
             totalDuration: subcourse.totalDuration,
             avgRating: subcourse.avgRating,
@@ -536,6 +541,7 @@ exports.getSubcoursesByCourseId = async (req, res) => {
             thumbnailImageUrl: subcourse.thumbnailImageUrl,
             isbestSeller: subcourse.isbestSeller,
             isUpComingCourse: subcourse.isUpComingCourse,
+
         }));
 
         return apiResponse(res, {
