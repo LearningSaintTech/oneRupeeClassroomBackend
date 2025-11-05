@@ -1135,13 +1135,12 @@ exports.progressBanner = async (req, res) => {
 exports.getSubcourseNameAndCertDesc = async (req, res) => {
   try {
     const { subcourseId } = req.params;
-    const userId = req.userId; // Assuming userId is set by auth middleware
+    const userId = req.userId;
 
-    console.log(`[DEBUG] Fetching subcourse name and certificate description for subcourseId: ${subcourseId}, userId: ${userId}`);
+    console.log(`[DEBUG] Fetching subcourse details for subcourseId: ${subcourseId}, userId: ${userId}`);
 
     // Validate subcourseId
     if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
-      console.log(`[DEBUG] Invalid subcourse ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid subcourse ID',
@@ -1151,7 +1150,6 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
 
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      console.log(`[DEBUG] Invalid user ID: ${userId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid user ID',
@@ -1159,25 +1157,12 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       });
     }
 
-    // Check if CertificatePayment model is valid
-    if (typeof CertificatePayment.findOne !== 'function') {
-      console.error('[DEBUG] CertificatePayment.findOne is not a function');
-      return apiResponse(res, {
-        success: false,
-        message: 'Internal server error: CertificatePayment model is invalid',
-        statusCode: 500,
-      });
-    }
-
-    // Fetch the subcourse with only subcourseName and certificateDescription
-    const subcourse = await Subcourse.findById(
-      subcourseId,
-      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId'
+    // Fetch subcourse with required fields
+    const subcourse = await Subcourse.findById(subcourseId).select(
+      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId internshipLetterPrice appleInternshipProductId'
     );
 
-    // Handle case where subcourse is not found
     if (!subcourse) {
-      console.log(`[DEBUG] Subcourse not found for ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
@@ -1185,31 +1170,51 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       });
     }
 
-    // Check payment status
-    const certificatePayment = await CertificatePayment.findOne({ userId, subcourseId, paymentStatus: true });
-    const isPaymentDone = !!certificatePayment; // true if payment exists and is completed, false otherwise
+    // Check Certificate Payment Status
+    const certificatePayment = await CertificatePayment.findOne({
+      userId,
+      subcourseId,
+      paymentStatus: true,
+    });
+    const isCertificatePaid = !!certificatePayment;
 
-    // Prepare response data
+    // Check Internship Letter Status
+    const internshipLetter = await InternshipLetter.findOne({
+      userId,
+      subcourseId,
+    });
+
+    const internshipPaymentStatus = internshipLetter?.paymentStatus || false;
+    const internshipUploadStatus = internshipLetter?.uploadStatus || 'upload'; // default
+
+    // Prepare response
     const responseData = {
       subcourseName: subcourse.subcourseName,
       certificateDescription: subcourse.certificateDescription,
       certificatePrice: subcourse.certificatePrice,
-      appleCertificateProductId:subcourse.appleCertificateProductId,
-      appleRecordedProductId:subcourse.appleRecordedProductId,
-      isPaymentDone,
+      appleCertificateProductId: subcourse.appleCertificateProductId,
+      appleRecordedProductId: subcourse.appleRecordedProductId,
+      isCertificatePaid,
+
+      // === INTERNSHIP LETTER FIELDS ===
+      internshipLetterPrice: subcourse.internshipLetterPrice || 0,
+      appleInternshipProductId: subcourse.appleInternshipProductId || null,
+      internshipPaymentStatus,
+      internshipUploadStatus,
+      // isInternshipPaid: internshipPaymentStatus, // alias for frontend
     };
 
     return apiResponse(res, {
       success: true,
-      message: 'Subcourse retrieved successfully',
+      message: 'Subcourse details retrieved successfully',
       data: responseData,
       statusCode: 200,
     });
   } catch (error) {
-    console.error('[DEBUG] Error fetching subcourse:', error);
+    console.error('[ERROR] getSubcourseNameAndCertDesc:', error);
     return apiResponse(res, {
       success: false,
-      message: `Failed to fetch subcourse: ${error.message}`,
+      message: `Server error: ${error.message}`,
       statusCode: 500,
     });
   }
