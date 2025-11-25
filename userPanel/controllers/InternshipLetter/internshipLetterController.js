@@ -498,6 +498,7 @@ exports.checkInternshipStatus = async (req, res) => {
         uploadStatus: internshipLetter.uploadStatus || 'upload',
         internshipLetter: internshipLetter.internshipLetter || null,
         appleInternshipProductId: internshipLetter.appleInternshipProductId || subcourse.appleInternshipProductId || null,
+        isInternshipLetterFree:subcourse.isInternshipLetterFree || null
       },
       statusCode: 200,
     });

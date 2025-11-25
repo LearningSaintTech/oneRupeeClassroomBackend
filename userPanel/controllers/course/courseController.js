@@ -417,7 +417,7 @@ exports.getSubcourseById = async (req, res) => {
           appleProductId: { $first: '$appleProductId' },
           appleCertificateProductId: { $first: '$appleCertificateProductId' },
           appleRecordedProductId: { $first: '$appleRecordedProductId' },
-
+          appleInternshipProductId:{$first:'$appleInternshipProductId'},
           // New boolean fields
           isCertificateFree: { $first: '$isCertificateFree' },
           isRecordedLessonFree: { $first: '$isRecordedLessonFree' },
@@ -463,6 +463,7 @@ exports.getSubcourseById = async (req, res) => {
           appleProductId: 1,
           appleCertificateProductId: 1,
           appleRecordedProductId: 1,
+          appleInternshipProductId:1,
 
           // New fields in response
           isCertificateFree: 1,
@@ -1155,7 +1156,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
 
     // Fetch subcourse with required fields
     const subcourse = await Subcourse.findById(subcourseId).select(
-      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId internshipLetterPrice appleInternshipProductId'
+      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId internshipLetterPrice appleInternshipProductId isCertificateFree'
     );
 
     if (!subcourse) {
@@ -1192,6 +1193,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       appleCertificateProductId: subcourse.appleCertificateProductId,
       appleRecordedProductId: subcourse.appleRecordedProductId,
       isPaymentDone,
+      isCertificateFree:subcourse.isCertificateFree,
 
       // === INTERNSHIP LETTER FIELDS ===
       internshipLetterPrice: subcourse.internshipLetterPrice || 0,

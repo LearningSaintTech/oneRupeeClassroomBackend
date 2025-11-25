@@ -734,7 +734,127 @@ exports.verifyApplePurchase = async (req, res) => {
     }
 
     // --- At this point: Valid new purchase! Continue to save... ---
-    // (Your saving logic goes here - you didn't include it, but it's safe now)
+    
+    // Check if usermainCourse exists for the user and main course
+    console.log('verifyApplePurchase: Checking for existing usermainCourse:', { userId, courseId: subcourse.courseId });
+    let usermainCourse = await UsermainCourse.findOne({
+      userId,
+      courseId: subcourse.courseId,
+    });
+
+    // If usermainCourse doesn't exist, create a new one
+    if (!usermainCourse) {
+      console.log('verifyApplePurchase: Creating new usermainCourse for:', { userId, courseId: subcourse.courseId });
+      usermainCourse = new UsermainCourse({
+        userId,
+        courseId: subcourse.courseId,
+        status: 'Course Pending',
+        isCompleted: false,
+        isCertificateDownloaded: false,
+      });
+      await usermainCourse.save();
+      console.log('verifyApplePurchase: usermainCourse created:', { usermainCourseId: usermainCourse._id });
+    } else {
+      console.log('verifyApplePurchase: usermainCourse already exists:', { usermainCourseId: usermainCourse._id });
+    }
+
+    // Create or update userCourse entry with payment details
+    console.log('verifyApplePurchase: Checking for existing userCourse:', { userId, subcourseId });
+    let userCourse = await UserCourse.findOne({ userId, subcourseId });
+
+    if (!userCourse) {
+      console.log('verifyApplePurchase: Creating new userCourse for:', { userId, subcourseId });
+      userCourse = new UserCourse({
+        userId,
+        courseId: subcourse.courseId,
+        subcourseId,
+        paymentStatus: true,
+        isCompleted: false,
+        progress: '0%',
+        appleTransactionId: payload.transactionId,
+        appleProductId: payload.productId,
+        paymentAmount: subcourse.certificatePrice || 0,
+        paymentCurrency: 'INR',
+        paymentDate: new Date(payload.purchaseDate),
+      });
+    } else {
+      console.log('verifyApplePurchase: Updating existing userCourse:', { userCourseId: userCourse._id });
+      userCourse.paymentStatus = true;
+      userCourse.appleTransactionId = payload.transactionId;
+      userCourse.appleProductId = payload.productId;
+      userCourse.paymentAmount = subcourse.certificatePrice || 0;
+      userCourse.paymentCurrency = 'INR';
+      userCourse.paymentDate = new Date(payload.purchaseDate);
+    }
+
+    await userCourse.save();
+    console.log('verifyApplePurchase: userCourse saved:', { userCourseId: userCourse._id, paymentStatus: userCourse.paymentStatus });
+
+    // Add subcourse to user's purchasedsubCourses array
+    if (!user.purchasedsubCourses.includes(subcourseId)) {
+      console.log('verifyApplePurchase: Adding subcourse to purchasedsubCourses:', { subcourseId });
+      user.purchasedsubCourses.push(subcourseId);
+      await user.save();
+      console.log('verifyApplePurchase: User updated with purchasedsubCourses:', { purchasedsubCourses: user.purchasedsubCourses });
+    } else {
+      console.log('verifyApplePurchase: Subcourse already in purchasedsubCourses:', { subcourseId });
+    }
+
+    // Increment totalStudentsEnrolled in subcourse
+    subcourse.totalStudentsEnrolled += 1;
+    await subcourse.save();
+    console.log('verifyApplePurchase: Subcourse updated:', { subcourseId, totalStudentsEnrolled: subcourse.totalStudentsEnrolled });
+
+    // Use a placeholder ObjectId for system-generated notifications
+    const systemSenderId = new mongoose.Types.ObjectId();
+    console.log('verifyApplePurchase: Generated systemSenderId for notification:', systemSenderId);
+
+    // Create and send notification for successful enrollment
+    const notificationData = {
+      recipientId: userId,
+      senderId: systemSenderId,
+      title: 'Subcourse Unlocked',
+      body: `You have successfully enrolled in ${subcourse.subcourseName}. Start learning now!`,
+      type: 'course_unlocked',
+      data: {
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
+      },
+      createdAt: new Date(),
+    };
+    console.log('verifyApplePurchase: Preparing notification:', notificationData);
+
+    // Save and send notification
+    const notification = await NotificationService.createAndSendNotification(notificationData);
+    console.log('verifyApplePurchase: Notification created and sent:', { notificationId: notification._id });
+
+    // Emit buy_course event
+    if (io) {
+      console.log('verifyApplePurchase: Emitting buy_course event to user:', userId);
+      emitBuyCourse(io, userId, {
+        id: notification._id,
+        title: notificationData.title,
+        body: notificationData.body,
+        type: notificationData.type,
+        createdAt: notification.createdAt,
+        courseId: subcourse.courseId,
+        subcourseId: subcourse._id,
+      });
+    } else {
+      console.log('verifyApplePurchase: Socket.IO instance not found');
+    }
+
+    console.log('verifyApplePurchase: Purchase verification and subcourse purchase successful');
+    return apiResponse(res, {
+      success: true,
+      message: 'Apple purchase verified and subcourse purchased successfully',
+      data: {
+        userCourse,
+        purchasedsubCourses: user.purchasedsubCourses,
+        totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
+      },
+      statusCode: 200,
+    });
 
   } catch (error) {
     console.error('verifyApplePurchase: Unexpected error:', error);
