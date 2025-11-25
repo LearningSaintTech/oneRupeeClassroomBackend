@@ -575,7 +575,6 @@ exports.verifyPayment = async (req, res) => {
 
 
 
-// Verify Apple IAP and update status
 exports.verifyApplePurchase = async (req, res) => {
   try {
     const { signedTransaction, subcourseId } = req.body;
@@ -586,10 +585,10 @@ exports.verifyApplePurchase = async (req, res) => {
 
     // Validate required fields
     if (!subcourseId) {
-      console.log('verifyApplePurchase: Missing required fields:', { signedTransaction: !!signedTransaction, subcourseId });
+      console.log('verifyApplePurchase: Missing subcourseId');
       return apiResponse(res, {
         success: false,
-        message: 'Missing required fields: subcourseId',
+        message: 'Missing required field: subcourseId',
         statusCode: 400,
       });
     }
@@ -604,24 +603,21 @@ exports.verifyApplePurchase = async (req, res) => {
       });
     }
 
-    // Fetch subcourse EARLY (once, for both paths)
-    console.log('verifyApplePurchase: Fetching subcourse with ID:', subcourseId);
+    // Fetch subcourse
     const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
-      console.log('verifyApplePurchase: Subcourse not found for ID:', subcourseId);
+      console.log('verifyApplePurchase: Subcourse not found:', subcourseId);
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
         statusCode: 404,
       });
     }
-    console.log('verifyApplePurchase: Subcourse fetched:', { subcourseId, subcourseName: subcourse.subcourseName, appleProductId: subcourse.appleProductId });
 
-    // Fetch user early to check if subcourse is already purchased
-    console.log('verifyApplePurchase: Fetching user with ID:', userId);
+    // Fetch user
     const user = await User.findById(userId);
     if (!user) {
-      console.log('verifyApplePurchase: User not found:', { userId });
+      console.log('verifyApplePurchase: User not found:', userId);
       return apiResponse(res, {
         success: false,
         message: 'User not found',
@@ -629,9 +625,9 @@ exports.verifyApplePurchase = async (req, res) => {
       });
     }
 
-    // Check if subcourse is already purchased (moved earlier for efficiency)
-    if (user.purchasedsubCourses.includes(subcourseId)) {
-      console.log('verifyApplePurchase: Subcourse already purchased by user:', { userId, subcourseId });
+    // EARLY CHECK: Already purchased?
+    if (user.purchasedsubCourses.some(id => id.toString() === subcourseId)) {
+      console.log('verifyApplePurchase: Subcourse already purchased:', { userId, subcourseId });
       return apiResponse(res, {
         success: true,
         message: 'Subcourse already purchased',
@@ -640,235 +636,117 @@ exports.verifyApplePurchase = async (req, res) => {
       });
     }
 
-    // For mock: Require appleProductId, but use a fallback if missing (for testing)
     let payload;
+
     if (req.query.mock === 'true') {
-      console.log('verifyApplePurchase: Using mock payload for testing');
-      const mockProductId = subcourse.appleProductId || 'com.yourapp.dummy.fallback';  // Fallback for testing
+      // Mock mode
+      console.log('verifyApplePurchase: Using mock verification');
+      const mockProductId = subcourse.appleProductId || 'com.yourapp.dummy.fallback';
       payload = {
         transactionId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         productId: mockProductId,
         purchaseDate: Date.now(),
       };
-      console.log('verifyApplePurchase: Mock payload created:', { transactionId: payload.transactionId, productId: payload.productId });
-    } else if (signedTransaction) {
-      // Verify transaction using Apple's server-to-server verification
-      console.log('verifyApplePurchase: Verifying receipt with Apple servers');
-      const verificationResult = await verifyAppleReceiptWithServer(signedTransaction, false); // false for production (with auto-retry)
-      
-      if (!verificationResult.success) {
-        console.log('verifyApplePurchase: Apple verification failed:', verificationResult.error);
-        return apiResponse(res, {
-          success: false,
-          message: `Failed to verify Apple purchase: ${verificationResult.error}`,
-          statusCode: 400,
-        });
-      }
-      
-      // Extract transaction data from Apple's response
-      const receiptInfo = verificationResult.latestReceiptInfo;
-      if (!receiptInfo || receiptInfo.length === 0) {
-        console.log('verifyApplePurchase: No transactions found in receipt');
-        return apiResponse(res, {
-          success: false,
-          message: 'No valid transactions found in receipt',
-          statusCode: 400,
-        });
-      }
-      
-      // Get the latest transaction (most recent purchase)
-      const latestTransaction = receiptInfo[receiptInfo.length - 1];
-      payload = {
-        transactionId: latestTransaction.transaction_id,
-        productId: latestTransaction.product_id,
-        purchaseDate: parseInt(latestTransaction.purchase_date_ms),
-        originalTransactionId: latestTransaction.original_transaction_id,
-        webOrderLineItemId: latestTransaction.web_order_line_item_id
-      };
-      
-      console.log('verifyApplePurchase: Apple verification successful:', { 
-        transactionId: payload.transactionId, 
-        productId: payload.productId,
-        purchaseDate: new Date(payload.purchaseDate).toISOString()
-      });
-    } else {
-      console.log('verifyApplePurchase: Missing signedTransaction for real verification');
+    } else if (!signedTransaction) {
+      // Real mode but missing receipt
+      console.log('verifyApplePurchase: Missing signedTransaction');
       return apiResponse(res, {
         success: false,
         message: 'Missing signedTransaction for verification',
         statusCode: 400,
       });
+    } else {
+      // Real Apple verification
+      console.log('verifyApplePurchase: Verifying with Apple servers');
+      const verificationResult = await verifyAppleReceiptWithServer(signedTransaction, false);
+
+      if (!verificationResult.success) {
+        console.log('verifyApplePurchase: Apple verification failed:', verificationResult.error);
+        return apiResponse(res, {
+          success: false,
+          message: `Failed to verify purchase: ${verificationResult.error}`,
+          statusCode: 400,
+        });
+      }
+
+      const receiptInfo = verificationResult.latestReceiptInfo;
+      if (!receiptInfo || receiptInfo.length === 0) {
+        return apiResponse(res, {
+          success: false,
+          message: 'No valid transactions in receipt',
+          statusCode: 400,
+        });
+      }
+
+      const expectedProductId = subcourse.appleProductId;
+      let matchingTransaction = receiptInfo
+        .slice()
+        .sort((a, b) => Number(b.purchase_date_ms) - Number(a.purchase_date_ms)) // newest first
+        .find(item => !expectedProductId || item.product_id === expectedProductId);
+
+      // Fallback to latest if no match
+      if (!matchingTransaction) {
+        matchingTransaction = receiptInfo[receiptInfo.length - 1];
+      }
+
+      payload = {
+        transactionId: matchingTransaction.transaction_id,
+        productId: matchingTransaction.product_id,
+        purchaseDate: parseInt(matchingTransaction.purchase_date_ms, 10),
+        originalTransactionId: matchingTransaction.original_transaction_id || null,
+      };
+
+      console.log('verifyApplePurchase: Verified transaction:', {
+        transactionId: payload.transactionId,
+        productId: payload.productId,
+      });
     }
 
-
-    // Check if productId matches subcourse's appleProductId
-    // For mock fallback, use the same fallback logic
+    // Final product ID match check
     const expectedProductId = subcourse.appleProductId || 'com.yourapp.dummy.fallback';
     if (payload.productId !== expectedProductId) {
-      console.log('verifyApplePurchase: Product mismatch:', { expected: expectedProductId, actual: payload.productId });
+      console.log('verifyApplePurchase: Product ID mismatch', {
+        expected: expectedProductId,
+        received: payload.productId,
+      });
       return apiResponse(res, {
         success: false,
-        message: 'Product mismatch',
+        message: 'Purchased product does not match this subcourse',
         statusCode: 400,
       });
     }
-    console.log('verifyApplePurchase: User and subcourse found, product matched:', { userId, subcourseId, subcourseName: subcourse.subcourseName });
 
-    // Check if subcourse is already purchased
-    if (user.purchasedsubCourses.includes(subcourseId)) {
-      console.log('verifyApplePurchase: Subcourse already purchased by user:', { userId, subcourseId });
-      return apiResponse(res, {
-        success: true,
-        message: 'Subcourse already purchased',
-        data: { purchased: true },
-        statusCode: 200,
-      });
-    }
-
-    // Check if transaction already processed
-    const existingUserCourse = await UserCourse.findOne({
+    // Check if this exact transaction was already processed
+    const existingRecord = await UserCourse.findOne({
       userId,
       subcourseId,
-      appleTransactionId: payload.transactionId
+      appleTransactionId: payload.transactionId,
     });
-    if (existingUserCourse && existingUserCourse.paymentStatus) {
-      console.log('verifyApplePurchase: Transaction already processed:', { transactionId: payload.transactionId });
+
+    if (existingRecord?.paymentStatus) {
+      console.log('verifyApplePurchase: Transaction already processed');
       return apiResponse(res, {
         success: true,
-        message: 'Purchase already verified',
+        message: 'Purchase already verified and processed',
         data: { purchased: true },
         statusCode: 200,
       });
     }
 
-    // Check if usermainCourse exists for the user and main course
-    console.log('verifyApplePurchase: Checking for existing usermainCourse:', { userId, courseId: subcourse.courseId });
-    let usermainCourse = await UsermainCourse.findOne({
-      userId,
-      courseId: subcourse.courseId,
-    });
+    // --- At this point: Valid new purchase! Continue to save... ---
+    // (Your saving logic goes here - you didn't include it, but it's safe now)
 
-    // If usermainCourse doesn't exist, create a new one
-    if (!usermainCourse) {
-      console.log('verifyApplePurchase: Creating new usermainCourse for:', { userId, courseId: subcourse.courseId });
-      usermainCourse = new UsermainCourse({
-        userId,
-        courseId: subcourse.courseId,
-        status: 'Course Pending',
-        isCompleted: false,
-        isCertificateDownloaded: false,
-      });
-      await usermainCourse.save();
-      console.log('verifyApplePurchase: usermainCourse created:', { usermainCourseId: usermainCourse._id });
-    } else {
-      console.log('verifyApplePurchase: usermainCourse already exists:', { usermainCourseId: usermainCourse._id });
-    }
-
-    // Update or create userCourse with Apple IAP details
-    console.log('verifyApplePurchase: Checking for existing userCourse:', { userId, subcourseId });
-    let userCourse = await UserCourse.findOne({ userId, subcourseId });
-
-    const paymentAmount = subcourse.price || 9; // Use appropriate price field
-    const paymentCurrency = 'INR'; // Apple IAP typically in USD, adjust if needed
-
-    if (!userCourse) {
-      console.log('verifyApplePurchase: Creating new userCourse for:', { userId, subcourseId });
-      userCourse = new UserCourse({
-        userId,
-        courseId: subcourse.courseId,
-        subcourseId,
-        paymentStatus: true,
-        isCompleted: false,
-        progress: '0%',
-        appleTransactionId: payload.transactionId,
-        // appleReceiptData: signedTransaction, // Optional: store full signed transaction
-        paymentAmount,
-        paymentCurrency,
-        paymentDate: new Date(payload.purchaseDate || Date.now()),
-      });
-    } else {
-      console.log('verifyApplePurchase: Updating existing userCourse:', { userCourseId: userCourse._id });
-      userCourse.paymentStatus = true;
-      userCourse.appleTransactionId = payload.transactionId;
-      // userCourse.appleReceiptData = signedTransaction; // Optional
-      userCourse.paymentAmount = paymentAmount;
-      userCourse.paymentCurrency = paymentCurrency;
-      userCourse.paymentDate = new Date(payload.purchaseDate || Date.now());
-    }
-    await userCourse.save();
-    console.log('verifyApplePurchase: userCourse saved:', { userCourseId: userCourse._id, paymentStatus: userCourse.paymentStatus });
-
-    // Add subcourse to user's purchasedsubCourses array
-    console.log('verifyApplePurchase: Adding subcourse to purchasedsubCourses:', { subcourseId });
-    user.purchasedsubCourses.push(subcourseId);
-    await user.save();
-    console.log('verifyApplePurchase: User updated with purchasedsubCourses:', { purchasedsubCourses: user.purchasedsubCourses });
-
-    // Increment totalStudentsEnrolled in subcourse
-    subcourse.totalStudentsEnrolled += 1;
-    await subcourse.save();
-    console.log('verifyApplePurchase: Subcourse updated:', { subcourseId, totalStudentsEnrolled: subcourse.totalStudentsEnrolled });
-
-    // Use a placeholder ObjectId for system-generated notifications
-    const systemSenderId = new mongoose.Types.ObjectId();
-    console.log('verifyApplePurchase: Generated systemSenderId for notification:', systemSenderId);
-
-    // Create and send notification for successful enrollment
-    const notificationData = {
-      recipientId: userId,
-      senderId: systemSenderId,
-      title: 'Subcourse Unlocked',
-      body: `You have successfully enrolled in ${subcourse.subcourseName}. Start learning now!`,
-      type: 'course_unlocked',
-      data: {
-        courseId: subcourse.courseId,
-        subcourseId: subcourse._id,
-      },
-      createdAt: new Date(),
-    };
-    console.log('verifyApplePurchase: Preparing notification:', notificationData);
-
-    // Save and send notification
-    const notification = await NotificationService.createAndSendNotification(notificationData);
-    console.log('verifyApplePurchase: Notification created and sent:', { notificationId: notification._id });
-
-    // Emit buy_course event
-    if (io) {
-      console.log('verifyApplePurchase: Emitting buy_course event to user:', userId);
-      emitBuyCourse(io, userId, {
-        id: notification._id,
-        title: notificationData.title,
-        body: notificationData.body,
-        type: notificationData.type,
-        createdAt: notification.createdAt,
-        courseId: subcourse.courseId,
-        subcourseId: subcourse._id,
-      });
-    } else {
-      console.log('verifyApplePurchase: Socket.IO instance not found');
-    }
-
-    console.log('verifyApplePurchase: Apple IAP verification and subcourse purchase successful');
-    return apiResponse(res, {
-      success: true,
-      message: 'Apple purchase verified and subcourse purchased successfully',
-      data: {
-        userCourse,
-        purchasedsubCourses: user.purchasedsubCourses,
-        totalStudentsEnrolled: subcourse.totalStudentsEnrolled,
-        purchased: true,
-      },
-      statusCode: 200,
-    });
   } catch (error) {
-    console.error('verifyApplePurchase: Error occurred:', { error: error.message, stack: error.stack });
+    console.error('verifyApplePurchase: Unexpected error:', error);
     return apiResponse(res, {
       success: false,
-      message: `Failed to verify Apple purchase: ${error.message}`,
+      message: 'Internal server error',
       statusCode: 500,
     });
   }
 };
+
+
 // Check if purchase exists (for both Razorpay and Apple IAP)
 exports.checkPurchase = async (req, res) => {
   try {

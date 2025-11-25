@@ -74,9 +74,9 @@ const subcourseSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    internshipLetterPrice:{
-        type:Number,
-        default:1
+    internshipLetterPrice: {
+        type: Number,
+        default: 1
     },
     appleProductId: {
         type: String,
@@ -89,6 +89,22 @@ const subcourseSchema = new mongoose.Schema({
     appleRecordedProductId: {
         type: String,
         default: ""
+    },
+    appleInternshipProductId: {
+        type: String,
+        default: ""
+    },
+    isCertificateFree: {
+        type: Boolean,
+        default: false
+    },
+    isRecordedLessonFree: {
+        type: Boolean,
+        default: false
+    },
+    isInternshipLetterFree: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 

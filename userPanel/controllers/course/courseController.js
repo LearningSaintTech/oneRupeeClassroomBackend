@@ -317,12 +317,12 @@ exports.getNewestCourses = async (req, res) => {
 exports.getSubcourseById = async (req, res) => {
   try {
     const subcourseId = req.params.id;
-    const userId = req.userId; // Assuming user ID is available from JWT middleware
+    const userId = req.userId; // From JWT middleware
+
     console.log(`Fetching subcourse with ID: ${subcourseId}, User ID: ${userId}`);
 
     // Validate subcourseId
     if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
-      console.log(`Invalid subcourse ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Invalid subcourse ID',
@@ -330,81 +330,55 @@ exports.getSubcourseById = async (req, res) => {
       });
     }
 
-    // Check payment status if userId is provided
+    // User-related checks (payment, completion, recorded lessons purchase)
     let paymentStatus = false;
     let subcourseCompleted = false;
     let isRecordedLessonPurchased = false;
+
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      console.log(`Valid userId: ${userId}, checking user...`);
       const user = await User.findById(userId);
       if (user) {
-        console.log(`User found: ${userId}, checking purchasedsubCourses...`);
-        // Check payment status
         paymentStatus = user.purchasedsubCourses.some(
           purchase => purchase.toString() === subcourseId.toString()
         );
-        console.log(`Payment status for subcourse ${subcourseId}: ${paymentStatus}`);
 
-        // Check subcourse completion status
         const userCourse = await UserCourse.findOne({ userId, subcourseId });
-        if (userCourse) {
-          subcourseCompleted = userCourse.isCompleted;
-          console.log(`Subcourse ${subcourseId} completion status: ${subcourseCompleted}`);
-        } else {
-          console.log(`No UserCourse found for userId: ${userId}, subcourseId: ${subcourseId}`);
-        }
+        if (userCourse) subcourseCompleted = userCourse.isCompleted;
 
-        // Check recorded lesson purchase status
         const recordedLesson = await RecordedLesson.findOne({ userId, subcourseId, paymentStatus: true });
-        if (recordedLesson) {
-          isRecordedLessonPurchased = true;
-          console.log(`Recorded lesson purchased for subcourse ${subcourseId}: true`);
-        } else {
-          console.log(`No recorded lesson purchase found for userId: ${userId}, subcourseId: ${subcourseId}`);
-        }
-      } else {
-        console.log(`User not found for ID: ${userId}`);
+        if (recordedLesson) isRecordedLessonPurchased = true;
       }
-    } else {
-      console.log(`Invalid or missing userId: ${userId}`);
     }
 
-    // Fetch the top 5 subcourses by totalStudentsEnrolled to determine best sellers
-    console.log('Fetching top 5 subcourses for best seller threshold...');
+    // Determine best-seller threshold (top 5 by enrollment)
     const topSubcourses = await Subcourse.aggregate([
       { $sort: { totalStudentsEnrolled: -1 } },
       { $limit: 5 },
       { $project: { totalStudentsEnrolled: 1 } }
     ]);
-    console.log(`Top subcourses: ${JSON.stringify(topSubcourses)}`);
+    const bestSellerThreshold = topSubcourses.length > 0 
+      ? topSubcourses[topSubcourses.length - 1].totalStudentsEnrolled 
+      : 0;
 
-    // Extract the minimum totalStudentsEnrolled among the top 5
-    const bestSellerThreshold = topSubcourses.length > 0 ? topSubcourses[topSubcourses.length - 1].totalStudentsEnrolled : 0;
-    console.log(`Best seller threshold: ${bestSellerThreshold}`);
-
-    // Aggregation pipeline for the requested subcourse
-    console.log(`Running aggregation pipeline for subcourse: ${subcourseId}`);
+    // Main aggregation pipeline
     const subcourse = await Subcourse.aggregate([
-      {
-        $match: { _id: new mongoose.Types.ObjectId(subcourseId) }
-      },
+      { $match: { _id: new mongoose.Types.ObjectId(subcourseId) } },
+
+      // Join lessons
       {
         $lookup: {
-          from: 'lessons', // Collection name for Lesson model
+          from: 'lessons',
           localField: '_id',
           foreignField: 'subcourseId',
           as: 'lessons'
         }
       },
-      {
-        $unwind: {
-          path: '$lessons',
-          preserveNullAndEmptyArrays: true // Keep subcourse even if no lessons
-        }
-      },
+      { $unwind: { path: '$lessons', preserveNullAndEmptyArrays: true } },
+
+      // Join user lesson completion
       {
         $lookup: {
-          from: 'userlessons', // Collection name for UserLesson model
+          from: 'userlessons',
           let: { lessonId: '$lessons._id', userId: new mongoose.Types.ObjectId(userId) },
           pipeline: [
             {
@@ -422,6 +396,8 @@ exports.getSubcourseById = async (req, res) => {
           as: 'lessonCompletion'
         }
       },
+
+      // Group back to subcourse level
       {
         $group: {
           _id: '$_id',
@@ -432,11 +408,21 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: { $first: '$totalDuration' },
           subCourseDescription: { $first: '$subCourseDescription' },
           totalLessons: { $first: '$totalLessons' },
-          price:{$first:'$price'},
+          price: { $first: '$price' },
+          certificatePrice: { $first: '$certificatePrice' },
+          certificateDescription: { $first: '$certificateDescription' },
+          internshipLetterPrice: { $first: '$internshipLetterPrice' },
           recordedlessonsPrice: { $first: '$recordedlessonsPrice' },
           recordedlessonsLink: { $first: '$recordedlessonsLink' },
-          appleProductId:{$first:'$appleProductId'},
-          appleRecordedProductId:{$first:'$appleRecordedProductId'},
+          appleProductId: { $first: '$appleProductId' },
+          appleCertificateProductId: { $first: '$appleCertificateProductId' },
+          appleRecordedProductId: { $first: '$appleRecordedProductId' },
+
+          // New boolean fields
+          isCertificateFree: { $first: '$isCertificateFree' },
+          isRecordedLessonFree: { $first: '$isRecordedLessonFree' },
+          isInternshipLetterFree: { $first: '$isInternshipLetterFree' },
+
           lessons: {
             $push: {
               lessonId: '$lessons._id',
@@ -457,6 +443,8 @@ exports.getSubcourseById = async (req, res) => {
           }
         }
       },
+
+      // Final projection
       {
         $project: {
           introVideoUrl: 1,
@@ -466,12 +454,23 @@ exports.getSubcourseById = async (req, res) => {
           totalDuration: 1,
           subCourseDescription: 1,
           totalLessons: 1,
-          price:1,
+          price: 1,
+          certificatePrice: 1,
+          certificateDescription: 1,
+          internshipLetterPrice: 1,
           recordedlessonsPrice: 1,
           recordedlessonsLink: 1,
-          appleProductId:1,
-          appleRecordedProductId:1,
+          appleProductId: 1,
+          appleCertificateProductId: 1,
+          appleRecordedProductId: 1,
+
+          // New fields in response
+          isCertificateFree: 1,
+          isRecordedLessonFree: 1,
+          isInternshipLetterFree: 1,
+
           lessons: 1,
+
           isBestSeller: {
             $cond: {
               if: { $gte: ['$totalStudentsEnrolled', bestSellerThreshold] },
@@ -479,18 +478,16 @@ exports.getSubcourseById = async (req, res) => {
               else: false
             }
           },
+
+          // User-specific flags
           paymentStatus: { $literal: paymentStatus },
-          isCompleted: { $literal: subcourseCompleted }, // Add subcourse completion status
+          isCompleted: { $literal: subcourseCompleted },
           isRecordedLessonPurchased: { $literal: isRecordedLessonPurchased }
         }
       }
-    ]).then(results => {
-      console.log(`Aggregation result: ${JSON.stringify(results[0])}`);
-      return results[0];
-    }); // Get the first (and only) result
+    ]).then(results => results[0]);
 
     if (!subcourse) {
-      console.log(`Subcourse not found for ID: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
@@ -498,7 +495,6 @@ exports.getSubcourseById = async (req, res) => {
       });
     }
 
-    console.log(`Subcourse details retrieved successfully for ID: ${subcourseId}`);
     return apiResponse(res, {
       success: true,
       message: 'Subcourse details retrieved successfully',
