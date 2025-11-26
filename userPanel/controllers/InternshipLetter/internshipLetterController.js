@@ -244,16 +244,29 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
   }
 }
 
-// Request Internship Letter and Create Razorpay Order
+const moment = require('moment'); // optional: for nicer timestamps
+// If you don't have moment, you can use: new Date().toISOString()
+
 exports.requestInternshipLetter = async (req, res) => {
+  const startTime = Date.now();
+  const log = (msg, extra = {}) => {
+    console.log(`[DEBUG] [${new Date().toISOString()}] requestInternshipLetter | ${msg}`, {
+      userId: req.userId,
+      subcourseId: req.body.subcourseId,
+      duration: `${Date.now() - startTime}ms`,
+      ...extra,
+    });
+  };
+
   try {
     const { subcourseId } = req.body;
     const userId = req.userId;
 
-    console.log(`[DEBUG] Internship letter request - userId: ${userId}, subcourseId: ${subcourseId}`);
+    log('Incoming internship letter request', { subcourseId, userId });
 
     // 1. Validate subcourseId
     if (!subcourseId || !mongoose.Types.ObjectId.isValid(subcourseId)) {
+      log('Invalid subcourseId', { subcourseId });
       return apiResponse(res, {
         success: false,
         message: 'Valid subcourse ID is required',
@@ -262,39 +275,48 @@ exports.requestInternshipLetter = async (req, res) => {
     }
 
     // 2. Fetch subcourse
+    log('Fetching subcourse');
     const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
+      log('Subcourse not found', { subcourseId });
       return apiResponse(res, {
         success: false,
         message: 'Subcourse not found',
         statusCode: 404,
       });
     }
+    log('Subcourse found', { subcourseName: subcourse.subcourseName, isInternshipLetterFree: subcourse.isInternshipLetterFree });
 
     // 3. Fetch user
+    log('Fetching user');
     const user = await UserAuth.findById(userId);
     if (!user) {
+      log('User not found', { userId });
       return apiResponse(res, {
         success: false,
         message: 'User not found',
         statusCode: 404,
       });
     }
+    log('User found', { fullName: user.fullName });
 
-    // 4. Check if internship letter is FREE (from Subcourse)
+    // 4. Check if internship letter is FREE
     const isInternshipLetterFree = subcourse.isInternshipLetterFree === true;
+    log('Internship letter price check', { isInternshipLetterFree, price: subcourse.internshipLetterPrice });
 
     if (isInternshipLetterFree) {
-      console.log('[DEBUG] Internship letter is FREE. Skipping payment flow.');
+      log('FREE flow started');
 
       // Prevent duplicate free requests
       const alreadyRequested = await InternshipLetter.findOne({
         userId,
+        
         subcourseId,
         paymentStatus: true,
       });
 
       if (alreadyRequested) {
+        log('Duplicate free request blocked', { existingId: alreadyRequested._id });
         return apiResponse(res, {
           success: false,
           message: 'You have already requested this free internship letter',
@@ -302,7 +324,7 @@ exports.requestInternshipLetter = async (req, res) => {
         });
       }
 
-      // Create free request directly as completed
+      log('Creating free internship letter record');
       const internshipLetter = new InternshipLetter({
         userId,
         subcourseId,
@@ -313,6 +335,42 @@ exports.requestInternshipLetter = async (req, res) => {
       });
 
       await internshipLetter.save();
+      log('Free internship letter created successfully', { internshipLetterId: internshipLetter._id });
+
+      // Notify admin for free internship letter request
+      const subcourseDetail = await Subcourse.findById(subcourseId).select('subcourseName');
+      const userDetail = await UserAuth.findById(userId).select('fullName email');
+      const io = req.app.get('io');
+
+      await NotificationService.sendAdminNotification({
+        senderId: userId,
+        title: 'Free Internship Letter Request',
+        body: `Upload letter for ${userDetail.fullName} - ${subcourseDetail.subcourseName} (FREE)`,
+        type: 'internship_letter_payment',
+        data: {
+          internshipLetterId: internshipLetter._id,
+          subcourseId: internshipLetter.subcourseId,
+          userId,
+        },
+        createdAt: new Date(),
+      });
+      log('Admin notification sent for free request');
+
+      // Socket emit for free request
+      if (io) {
+        emitRequestInternshipLetter(io, userId, {
+          internshipLetterId: internshipLetter._id,
+          subcourseId: internshipLetter.subcourseId,
+          subcourseName: subcourseDetail.subcourseName,
+          userId,
+          userName: userDetail.fullName,
+          status: 'upload',
+          paymentStatus: true,
+          paymentDate: new Date(),
+          createdAt: new Date().toISOString(),
+        });
+        log('Socket event emitted to admin for free request');
+      }
 
       return apiResponse(res, {
         success: true,
@@ -323,9 +381,11 @@ exports.requestInternshipLetter = async (req, res) => {
     }
 
     // ========== PAID FLOW ==========
+    log('PAID flow started');
     const price = subcourse.internshipLetterPrice;
 
     if (!price || price <= 0) {
+      log('Price not configured or invalid', { price });
       return apiResponse(res, {
         success: false,
         message: 'Internship letter price not configured',
@@ -341,6 +401,7 @@ exports.requestInternshipLetter = async (req, res) => {
     });
 
     if (alreadyPaid) {
+      log('Duplicate paid request blocked', { existingId: alreadyPaid._id });
       return apiResponse(res, {
         success: false,
         message: 'You have already paid for this internship letter',
@@ -350,6 +411,8 @@ exports.requestInternshipLetter = async (req, res) => {
 
     // Create Razorpay order
     const receipt = `int_${userId.toString().slice(-8)}_${Date.now()}`;
+    log('Creating Razorpay order', { amount: price * 100, receipt });
+
     const razorpayOrder = await razorpayInstance.orders.create({
       amount: price * 100,
       currency: 'INR',
@@ -357,12 +420,14 @@ exports.requestInternshipLetter = async (req, res) => {
     });
 
     if (!razorpayOrder?.id) {
+      log('Razorpay order creation failed', { razorpayResponse: razorpayOrder });
       return apiResponse(res, {
         success: false,
         message: 'Failed to create payment order',
         statusCode: 500,
       });
     }
+    log('Razorpay order created', { orderId: razorpayOrder.id, amount: razorpayOrder.amount });
 
     // Reuse pending request or create new
     let internshipLetter = await InternshipLetter.findOne({
@@ -372,9 +437,11 @@ exports.requestInternshipLetter = async (req, res) => {
     });
 
     if (internshipLetter) {
+      log('Reusing existing pending internship letter', { internshipLetterId: internshipLetter._id });
       internshipLetter.razorpayOrderId = razorpayOrder.id;
       internshipLetter.paymentAmount = price;
     } else {
+      log('Creating new pending internship letter record');
       internshipLetter = new InternshipLetter({
         userId,
         subcourseId,
@@ -387,6 +454,7 @@ exports.requestInternshipLetter = async (req, res) => {
     }
 
     await internshipLetter.save();
+    log('Internship letter record saved', { internshipLetterId: internshipLetter._id, razorpayOrderId: razorpayOrder.id });
 
     return apiResponse(res, {
       success: true,
@@ -403,7 +471,7 @@ exports.requestInternshipLetter = async (req, res) => {
       statusCode: 201,
     });
   } catch (error) {
-    console.error('[ERROR] requestInternshipLetter:', error);
+    console.error(`[ERROR] requestInternshipLetter | userId: ${req.userId} | duration: ${Date.now() - startTime}ms |`, error);
     return apiResponse(res, {
       success: false,
       message: 'Server error. Please try again later.',
@@ -412,31 +480,50 @@ exports.requestInternshipLetter = async (req, res) => {
   }
 };
 
+// =============================================
 // Verify and Update Payment Status
+// =============================================
 exports.updatePaymentStatus = async (req, res) => {
+  const startTime = Date.now();
+  const log = (msg, extra = {}) => {
+    console.log(`[DEBUG] [${new Date().toISOString()}] updatePaymentStatus | ${msg}`, {
+      userId: req.userId,
+      internshipLetterId: req.body.internshipLetterId,
+      razorpayOrderId: req.body.razorpayOrderId,
+      duration: `${Date.now() - startTime}ms`,
+      ...extra,
+    });
+  };
+
   try {
     const { internshipLetterId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
     const userId = req.userId;
     const io = req.app.get('io');
 
+    log('Payment verification webhook received', { internshipLetterId, razorpayOrderId, razorpayPaymentId: !!razorpayPaymentId });
+
     if (!mongoose.Types.ObjectId.isValid(internshipLetterId)) {
+      log('Invalid internshipLetterId format');
       return apiResponse(res, { success: false, message: 'Invalid internship letter ID', statusCode: 400 });
     }
 
     const internshipLetter = await InternshipLetter.findOne({ _id: internshipLetterId, userId });
     if (!internshipLetter) {
+      log('Internship letter not found or unauthorized access', { internshipLetterId, userId });
       return apiResponse(res, { success: false, message: 'Request not found or unauthorized', statusCode: 404 });
     }
+    log('Internship letter found', { internshipLetterId: internshipLetter._id, currentStatus: internshipLetter.paymentStatus });
 
-    // Critical: Check if this subcourse has free internship letter
+    // Check if subcourse has free internship letter
     const subcourse = await Subcourse.findById(internshipLetter.subcourseId)
-      .select('isInternshipLetterFree')
+      .select('isInternshipLetterFree subcourseName')
       .lean();
 
     const isInternshipLetterFree = subcourse?.isInternshipLetterFree === true;
+    log('Subcourse free check', { subcourseId: internshipLetter.subcourseId, isInternshipLetterFree });
 
-    // Block if it's a free letter OR already paid
     if (isInternshipLetterFree || internshipLetter.paymentStatus === true) {
+      log('Payment blocked', { reason: isInternshipLetterFree ? 'free_letter' : 'already_paid' });
       return apiResponse(res, {
         success: false,
         message: isInternshipLetterFree
@@ -446,8 +533,9 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    // Validate Razorpay payload
+    // Validate payload
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      log('Missing Razorpay payload fields');
       return apiResponse(res, { success: false, message: 'Missing payment details', statusCode: 400 });
     }
 
@@ -457,12 +545,16 @@ exports.updatePaymentStatus = async (req, res) => {
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
+    log('Signature verification', { expectedSignature, receivedSignature: razorpaySignature, match: expectedSignature === razorpaySignature });
+
     if (expectedSignature !== razorpaySignature) {
+      log('Invalid payment signature - possible tampering!');
       return apiResponse(res, { success: false, message: 'Invalid payment signature', statusCode: 400 });
     }
 
-    // Extra security: match order ID
+    // Match order ID
     if (internshipLetter.razorpayOrderId !== razorpayOrderId) {
+      log('Order ID mismatch', { dbOrderId: internshipLetter.razorpayOrderId, payloadOrderId: razorpayOrderId });
       return apiResponse(res, { success: false, message: 'Order ID mismatch', statusCode: 400 });
     }
 
@@ -474,9 +566,11 @@ exports.updatePaymentStatus = async (req, res) => {
     internshipLetter.paymentDate = new Date();
     await internshipLetter.save();
 
+    log('Payment marked as SUCCESSFUL', { internshipLetterId: internshipLetter._id, razorpayPaymentId });
+
     // Notify admin
     const subcourseDetail = await Subcourse.findById(internshipLetter.subcourseId).select('subcourseName');
-    const user = await UserAuth.findById(userId).select('fullName');
+    const user = await UserAuth.findById(userId).select('fullName email');
 
     await NotificationService.sendAdminNotification({
       senderId: userId,
@@ -490,6 +584,7 @@ exports.updatePaymentStatus = async (req, res) => {
       },
       createdAt: new Date(),
     });
+    log('Admin notification sent');
 
     // Socket emit
     if (io) {
@@ -504,8 +599,10 @@ exports.updatePaymentStatus = async (req, res) => {
         paymentDate: internshipLetter.paymentDate,
         createdAt: new Date().toISOString(),
       });
+      log('Socket event emitted to admin');
     }
 
+    log('Payment verification completed successfully');
     return apiResponse(res, {
       success: true,
       message: 'Payment verified successfully',
@@ -513,7 +610,7 @@ exports.updatePaymentStatus = async (req, res) => {
       statusCode: 200,
     });
   } catch (error) {
-    console.error('[ERROR] updatePaymentStatus:', error);
+    console.error(`[ERROR] updatePaymentStatus | userId: ${req.userId} | duration: ${Date.now() - startTime}ms |`, error);
     return apiResponse(res, { success: false, message: 'Server error', statusCode: 500 });
   }
 };
@@ -627,6 +724,107 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
       });
     }
 
+    // Check if internship letter is FREE
+    const isInternshipLetterFree = subcourse.isInternshipLetterFree === true;
+    console.log('verifyAppleInternshipLetter: Free check', { isInternshipLetterFree, subcourseId });
+
+    if (isInternshipLetterFree) {
+      console.log('verifyAppleInternshipLetter: FREE flow started');
+
+      // Check existing internship letter request
+      let internshipLetter = await InternshipLetter.findOne({ userId, subcourseId });
+
+      // If already requested (free), return success
+      if (internshipLetter && internshipLetter.paymentStatus === true) {
+        return apiResponse(res, {
+          success: true,
+          message: 'Free internship letter already requested',
+          data: {
+            purchased: true,
+            subcourseId,
+            subcourseName: subcourse.subcourseName,
+            internshipLetter,
+          },
+          statusCode: 200,
+        });
+      }
+
+      // Create free internship letter record
+      if (!internshipLetter) {
+        internshipLetter = new InternshipLetter({
+          userId,
+          subcourseId,
+          paymentStatus: true,
+          paymentAmount: 0,
+          uploadStatus: 'upload',
+          paymentCurrency: 'INR',
+        });
+        await internshipLetter.save();
+        console.log('verifyAppleInternshipLetter: Free internship letter created', { internshipLetterId: internshipLetter._id });
+      } else {
+        // Update existing record
+        internshipLetter.paymentStatus = true;
+        internshipLetter.paymentAmount = 0;
+        internshipLetter.uploadStatus = 'upload';
+        internshipLetter.paymentCurrency = 'INR';
+        await internshipLetter.save();
+        console.log('verifyAppleInternshipLetter: Free internship letter updated', { internshipLetterId: internshipLetter._id });
+      }
+
+      // Fetch user details for notification
+      const user = await UserAuth.findById(userId).select('fullName email');
+      if (!user) {
+        return apiResponse(res, {
+          success: false,
+          message: 'User not found',
+          statusCode: 404,
+        });
+      }
+
+      // Send Admin Notification
+      await NotificationService.sendAdminNotification({
+        senderId: userId,
+        title: 'Free Internship Letter Request (Apple)',
+        body: `Upload letter for ${user.fullName} - ${subcourse.subcourseName} (FREE)`,
+        type: 'internship_letter_payment',
+        data: {
+          internshipLetterId: internshipLetter._id,
+          subcourseId: internshipLetter.subcourseId,
+          userId,
+        },
+        createdAt: new Date(),
+      });
+      console.log('verifyAppleInternshipLetter: Admin notification sent for free request');
+
+      // Socket emit for free request
+      if (io) {
+        emitRequestInternshipLetter(io, userId, {
+          internshipLetterId: internshipLetter._id,
+          subcourseId: internshipLetter.subcourseId,
+          subcourseName: subcourse.subcourseName,
+          userId,
+          userName: user.fullName,
+          status: 'upload',
+          paymentStatus: true,
+          paymentDate: new Date(),
+          createdAt: new Date().toISOString(),
+        });
+        console.log('verifyAppleInternshipLetter: Socket event emitted to admin for free request');
+      }
+
+      return apiResponse(res, {
+        success: true,
+        message: 'Free internship letter requested successfully. Admin will upload it soon.',
+        data: {
+          internshipLetter,
+          purchased: true,
+          subcourseName: subcourse.subcourseName,
+        },
+        statusCode: 200,
+      });
+    }
+
+    // ========== PAID FLOW (Apple IAP) ==========
     if (!subcourse.appleInternshipProductId) {
       return apiResponse(res, {
         success: false,
