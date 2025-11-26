@@ -69,26 +69,26 @@ async function verifyAppleTransactionLocally(signedTransaction) {
     console.log("🔍 [Apple Receipt] Raw receipt data:", signedTransaction);
     console.log("🔍 [Apple Receipt] Type:", typeof signedTransaction);
     console.log("🔍 [Apple Receipt] Length:", signedTransaction.length);
-    
+
     // Check if it's a JWT format (has 3 parts separated by dots)
     const jwtParts = signedTransaction.split('.');
     console.log("🔍 [Apple Receipt] JWT Parts count:", jwtParts.length);
-    
+
     if (jwtParts.length === 3) {
       console.log("🔍 [Apple Receipt] This is a JWT format");
-      
+
       // Decode header (first part)
       const header = JSON.parse(Buffer.from(jwtParts[0], 'base64').toString('utf-8'));
       console.log("🔍 [Apple Receipt] JWT Header:", JSON.stringify(header, null, 2));
-      
+
       // Decode payload (second part) - this is what we need
       const payload = JSON.parse(Buffer.from(jwtParts[1], 'base64').toString('utf-8'));
       console.log("🔍 [Apple Receipt] JWT Payload:", JSON.stringify(payload, null, 2));
-      
+
       // Get the kid from header for key verification
       const kid = header.kid;
       console.log("🔍 [Apple Receipt] Key ID (kid):", kid);
-      
+
       const keys = await fetchApplePublicKeys();
       console.log("🔍 [Apple Receipt] Available keys:", keys.map(k => ({ kid: k.kid, alg: k.alg })));
 
@@ -99,21 +99,21 @@ async function verifyAppleTransactionLocally(signedTransaction) {
       }
 
       console.log("🔍 [Apple Receipt] Found matching key:", keyData);
-      
+
       const key = await jose.JWK.asKey(keyData);
       const verified = await jose.JWS.createVerify(key).verify(signedTransaction);
 
       // Parsed verified payload
       const verifiedPayload = JSON.parse(verified.payload.toString());
       console.log("🔍 [Apple Receipt] Verified payload:", JSON.stringify(verifiedPayload, null, 2));
-      
+
       return verifiedPayload; // Contains productId, transactionId, purchaseDate, etc.
     } else {
       // This is a PKCS#7 receipt - we need to use Apple's server-to-server verification
       console.log("🔍 [Apple Receipt] This is a PKCS#7 receipt format");
       console.log("🔍 [Apple Receipt] First 100 characters:", signedTransaction.substring(0, 100));
       console.log("🔍 [Apple Receipt] Last 100 characters:", signedTransaction.substring(signedTransaction.length - 100));
-      
+
       // For PKCS#7 receipts, we should use Apple's server-to-server verification
       // instead of local verification
       throw new Error('PKCS#7 receipt detected. Use Apple server-to-server verification instead of local verification.');
@@ -139,7 +139,7 @@ function getAppleErrorDescription(statusCode) {
     21009: 'Internal data access error',
     21010: 'The user account cannot be found or has been deleted'
   };
-  
+
   return errorCodes[statusCode] || `Unknown error code: ${statusCode}`;
 }
 
@@ -149,7 +149,7 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
     console.log("🔍 [Apple Server Verification] Starting server verification");
     console.log("🔍 [Apple Server Verification] Receipt length:", receiptData.length);
     console.log("🔍 [Apple Server Verification] Initial Environment:", isSandbox ? 'Sandbox' : 'Production');
-    
+
     const sharedSecret = process.env.APPLE_SHARED_SECRET;
     console.log("🔍 [Apple Server Verification] Loaded APPLE_SHARED_SECRET from environment:", sharedSecret || 'Not set');
     if (!sharedSecret) {
@@ -162,22 +162,22 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
     }
 
     // First attempt with the specified environment
-    let url = isSandbox 
+    let url = isSandbox
       ? 'https://sandbox.itunes.apple.com/verifyReceipt'
       : 'https://buy.itunes.apple.com/verifyReceipt';
-    
+
     const requestBody = {
       'receipt-data': receiptData,
       'password': sharedSecret,
       'exclude-old-transactions': true
     };
-    
+
     console.log("🔍 [Apple Server Verification] Request body:", {
       'receipt-data': receiptData.substring(0, 100) + '...',
       'password': requestBody.password ? '***' : 'not set',
       'exclude-old-transactions': requestBody['exclude-old-transactions']
     });
-    
+
     let response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -185,10 +185,10 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
       },
       body: JSON.stringify(requestBody)
     });
-    
+
     let result = await response.json();
     console.log("🔍 [Apple Server Verification] Apple response:", JSON.stringify(result, null, 2));
-    
+
     // Handle environment mismatch errors
     if (result.status === 21007) {
       // Receipt is from sandbox but sent to production - retry with sandbox
@@ -217,7 +217,7 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
       result = await response.json();
       console.log("🔍 [Apple Server Verification] Retry response:", JSON.stringify(result, null, 2));
     }
-    
+
     if (result.status === 0) {
       console.log("✅ [Apple Server Verification] Receipt verified successfully");
       return {
@@ -247,31 +247,31 @@ async function verifyAppleReceiptWithServer(receiptData, isSandbox = false) {
 // Request Internship Letter and Create Razorpay Order
 exports.requestInternshipLetter = async (req, res) => {
   try {
-    const { subcourseId } = req.body;               // <-- subcourseId now
+    const { subcourseId } = req.body;
     const userId = req.userId;
 
-    console.log(`[DEBUG] Request received - userId: ${userId}, subcourseId: ${subcourseId}`);
+    console.log(`[DEBUG] Internship letter request - userId: ${userId}, subcourseId: ${subcourseId}`);
 
-    // ---------- 1. Validate subcourseId ----------
-    if (!mongoose.Types.ObjectId.isValid(subcourseId)) {
+    // 1. Validate subcourseId
+    if (!subcourseId || !mongoose.Types.ObjectId.isValid(subcourseId)) {
       return apiResponse(res, {
         success: false,
-        message: 'Invalid subcourse ID',
+        message: 'Valid subcourse ID is required',
         statusCode: 400,
       });
     }
 
-    // ---------- 2. Sub-course exists ----------
+    // 2. Fetch subcourse
     const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
       return apiResponse(res, {
         success: false,
-        message: 'Sub-course not found',
+        message: 'Subcourse not found',
         statusCode: 404,
       });
     }
 
-    // ---------- 3. User exists ----------
+    // 3. Fetch user
     const user = await UserAuth.findById(userId);
     if (!user) {
       return apiResponse(res, {
@@ -281,30 +281,77 @@ exports.requestInternshipLetter = async (req, res) => {
       });
     }
 
-    // ---------- 4. Price validation ----------
-    const price = subcourse.internshipLetterPrice 
+    // 4. Check if internship letter is FREE (from Subcourse)
+    const isInternshipLetterFree = subcourse.isInternshipLetterFree === true;
+
+    if (isInternshipLetterFree) {
+      console.log('[DEBUG] Internship letter is FREE. Skipping payment flow.');
+
+      // Prevent duplicate free requests
+      const alreadyRequested = await InternshipLetter.findOne({
+        userId,
+        subcourseId,
+        paymentStatus: true,
+      });
+
+      if (alreadyRequested) {
+        return apiResponse(res, {
+          success: false,
+          message: 'You have already requested this free internship letter',
+          statusCode: 400,
+        });
+      }
+
+      // Create free request directly as completed
+      const internshipLetter = new InternshipLetter({
+        userId,
+        subcourseId,
+        paymentStatus: true,
+        paymentAmount: 0,
+        uploadStatus: 'upload',
+        paymentCurrency: 'INR',
+      });
+
+      await internshipLetter.save();
+
+      return apiResponse(res, {
+        success: true,
+        message: 'Free internship letter requested successfully. Admin will upload it soon.',
+        data: { internshipLetter },
+        statusCode: 201,
+      });
+    }
+
+    // ========== PAID FLOW ==========
+    const price = subcourse.internshipLetterPrice;
+
     if (!price || price <= 0) {
       return apiResponse(res, {
         success: false,
-        message: 'Internship price not defined for this sub-course',
+        message: 'Internship letter price not configured',
         statusCode: 400,
       });
     }
 
-    // ---------- 5. Existing request ----------
-    let internshipLetter = await InternshipLetter.findOne({ userId, subcourseId });
-    if (internshipLetter && internshipLetter.paymentStatus === true) {
+    // Prevent duplicate paid requests
+    const alreadyPaid = await InternshipLetter.findOne({
+      userId,
+      subcourseId,
+      paymentStatus: true,
+    });
+
+    if (alreadyPaid) {
       return apiResponse(res, {
         success: false,
-        message: 'Payment already completed for this internship letter request',
+        message: 'You have already paid for this internship letter',
         statusCode: 400,
       });
     }
 
-    // ---------- 6. Razorpay order ----------
-    const receipt = `int_${userId.toString().slice(-8)}_${Date.now().toString().slice(-6)}`;
+    // Create Razorpay order
+    const receipt = `int_${userId.toString().slice(-8)}_${Date.now()}`;
     const razorpayOrder = await razorpayInstance.orders.create({
-      amount: price * 100,          // paise
+      amount: price * 100,
       currency: 'INR',
       receipt,
     });
@@ -312,47 +359,54 @@ exports.requestInternshipLetter = async (req, res) => {
     if (!razorpayOrder?.id) {
       return apiResponse(res, {
         success: false,
-        message: 'Failed to create Razorpay order',
+        message: 'Failed to create payment order',
         statusCode: 500,
       });
     }
 
-    // ---------- 7. Create / Update InternshipLetter ----------
-    if (internshipLetter && internshipLetter.paymentStatus === false) {
-      // reuse existing (failed/pending) request
+    // Reuse pending request or create new
+    let internshipLetter = await InternshipLetter.findOne({
+      userId,
+      subcourseId,
+      paymentStatus: false,
+    });
+
+    if (internshipLetter) {
       internshipLetter.razorpayOrderId = razorpayOrder.id;
       internshipLetter.paymentAmount = price;
-      internshipLetter.paymentCurrency = 'INR';
-      internshipLetter.uploadStatus = 'upload';
-      internshipLetter.updatedAt = new Date();
-      await internshipLetter.save();
     } else {
       internshipLetter = new InternshipLetter({
         userId,
-        subcourseId,               // <-- store subcourseId
+        subcourseId,
         paymentStatus: false,
-        uploadStatus: 'upload',
         paymentAmount: price,
         paymentCurrency: 'INR',
         razorpayOrderId: razorpayOrder.id,
+        uploadStatus: 'upload',
       });
-      await internshipLetter.save();
     }
 
-    // ---------- 8. Response ----------
+    await internshipLetter.save();
+
     return apiResponse(res, {
       success: true,
-      message: internshipLetter.isNew
-        ? 'Internship letter request created successfully'
-        : 'Internship letter request updated successfully',
-      data: { internshipLetter, razorpayOrder },
+      message: 'Payment order created successfully',
+      data: {
+        internshipLetter,
+        razorpayOrder: {
+          id: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          receipt: razorpayOrder.receipt,
+        },
+      },
       statusCode: 201,
     });
   } catch (error) {
     console.error('[ERROR] requestInternshipLetter:', error);
     return apiResponse(res, {
       success: false,
-      message: `Server error: ${error.message}`,
+      message: 'Server error. Please try again later.',
       statusCode: 500,
     });
   }
@@ -365,7 +419,6 @@ exports.updatePaymentStatus = async (req, res) => {
     const userId = req.userId;
     const io = req.app.get('io');
 
-    // Validate ID
     if (!mongoose.Types.ObjectId.isValid(internshipLetterId)) {
       return apiResponse(res, { success: false, message: 'Invalid internship letter ID', statusCode: 400 });
     }
@@ -375,17 +428,45 @@ exports.updatePaymentStatus = async (req, res) => {
       return apiResponse(res, { success: false, message: 'Request not found or unauthorized', statusCode: 404 });
     }
 
-    // Signature verification
+    // Critical: Check if this subcourse has free internship letter
+    const subcourse = await Subcourse.findById(internshipLetter.subcourseId)
+      .select('isInternshipLetterFree')
+      .lean();
+
+    const isInternshipLetterFree = subcourse?.isInternshipLetterFree === true;
+
+    // Block if it's a free letter OR already paid
+    if (isInternshipLetterFree || internshipLetter.paymentStatus === true) {
+      return apiResponse(res, {
+        success: false,
+        message: isInternshipLetterFree
+          ? 'This internship letter is free. Payment not required.'
+          : 'Payment already completed for this request.',
+        statusCode: 400,
+      });
+    }
+
+    // Validate Razorpay payload
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return apiResponse(res, { success: false, message: 'Missing payment details', statusCode: 400 });
+    }
+
+    // Verify signature
     const expectedSignature = crypto
       .createHmac('sha256', razorpayInstance.key_secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
     if (expectedSignature !== razorpaySignature) {
-      return apiResponse(res, { success: false, message: 'Payment signature verification failed', statusCode: 400 });
+      return apiResponse(res, { success: false, message: 'Invalid payment signature', statusCode: 400 });
     }
 
-    // Mark paid
+    // Extra security: match order ID
+    if (internshipLetter.razorpayOrderId !== razorpayOrderId) {
+      return apiResponse(res, { success: false, message: 'Order ID mismatch', statusCode: 400 });
+    }
+
+    // Mark as paid
     internshipLetter.paymentStatus = true;
     internshipLetter.uploadStatus = 'upload';
     internshipLetter.razorpayPaymentId = razorpayPaymentId;
@@ -393,36 +474,33 @@ exports.updatePaymentStatus = async (req, res) => {
     internshipLetter.paymentDate = new Date();
     await internshipLetter.save();
 
-    // Notification data
-    const subcourse = await Subcourse.findById(internshipLetter.subcourseId).select('subcourseName');
+    // Notify admin
+    const subcourseDetail = await Subcourse.findById(internshipLetter.subcourseId).select('subcourseName');
     const user = await UserAuth.findById(userId).select('fullName');
 
-    const notificationData = {
+    await NotificationService.sendAdminNotification({
       senderId: userId,
-      title: 'Internship Letter upload request',
-      body: `Upload internship letter Subcourse=${subcourse.subcourseName},User=${user.fullName}`,
+      title: 'Internship Letter Payment Received',
+      body: `Upload letter for ${user.fullName} - ${subcourseDetail.subcourseName}`,
       type: 'internship_letter_payment',
       data: {
         internshipLetterId: internshipLetter._id,
         subcourseId: internshipLetter.subcourseId,
         userId,
-        Status: internshipLetter.uploadStatus,
-        PaymentStatus: internshipLetter.paymentStatus,
       },
       createdAt: new Date(),
-    };
-    await NotificationService.sendAdminNotification(notificationData);
+    });
 
-    // Socket emit (if io available)
+    // Socket emit
     if (io) {
       emitRequestInternshipLetter(io, userId, {
         internshipLetterId: internshipLetter._id,
         subcourseId: internshipLetter.subcourseId,
-        subcourseName: subcourse.subcourseName,
+        subcourseName: subcourseDetail.subcourseName,
         userId,
         userName: user.fullName,
-        status: internshipLetter.uploadStatus,
-        paymentStatus: internshipLetter.paymentStatus,
+        status: 'upload',
+        paymentStatus: true,
         paymentDate: internshipLetter.paymentDate,
         createdAt: new Date().toISOString(),
       });
@@ -430,12 +508,12 @@ exports.updatePaymentStatus = async (req, res) => {
 
     return apiResponse(res, {
       success: true,
-      message: 'Payment verified and status updated successfully',
+      message: 'Payment verified successfully',
       data: internshipLetter,
       statusCode: 200,
     });
   } catch (error) {
-    console.error('updatePaymentStatus error:', error);
+    console.error('[ERROR] updatePaymentStatus:', error);
     return apiResponse(res, { success: false, message: 'Server error', statusCode: 500 });
   }
 };
@@ -498,7 +576,7 @@ exports.checkInternshipStatus = async (req, res) => {
         uploadStatus: internshipLetter.uploadStatus || 'upload',
         internshipLetter: internshipLetter.internshipLetter || null,
         appleInternshipProductId: internshipLetter.appleInternshipProductId || subcourse.appleInternshipProductId || null,
-        isInternshipLetterFree:subcourse.isInternshipLetterFree || null
+        isInternshipLetterFree: subcourse.isInternshipLetterFree || null
       },
       statusCode: 200,
     });
