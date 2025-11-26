@@ -652,16 +652,36 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
       });
       
       if (existingPayment) {
-        console.log('verifyAppleSubcourseCertificate: Transaction already processed:', { 
+        const belongsToCurrentUser =
+          existingPayment.userId?.toString() === userId.toString() &&
+          existingPayment.subcourseId?.toString() === subcourseId.toString();
+
+        if (belongsToCurrentUser) {
+          console.log('verifyAppleSubcourseCertificate: Transaction already processed for this user, ensuring payment status');
+          if (!existingPayment.paymentStatus) {
+            existingPayment.paymentStatus = true;
+            existingPayment.paymentAmount = subcourse.certificatePrice || 0;
+            existingPayment.paymentCurrency = 'INR';
+            existingPayment.paymentDate = new Date();
+            await existingPayment.save();
+          }
+          return apiResponse(res, {
+            success: true,
+            message: 'Certificate purchase already verified',
+            data: { purchased: true },
+            statusCode: 200,
+          });
+        }
+
+        console.warn('verifyAppleSubcourseCertificate: Transaction already linked to another user/subcourse. Continuing to create payment for current user.', {
           transactionId: certificateTransaction.transaction_id,
-          existingPaymentId: existingPayment._id 
+          existingPaymentId: existingPayment._id,
+          existingUserId: existingPayment.userId,
+          existingSubcourseId: existingPayment.subcourseId,
+          currentUserId: userId,
+          currentSubcourseId: subcourseId,
         });
-        return apiResponse(res, {
-          success: true,
-          message: 'Certificate purchase already verified',
-          data: { purchased: true },
-          statusCode: 200,
-        });
+        // Do not return; continue so we create/update payment for the current user/subcourse
       }
       
       payload = {
@@ -987,7 +1007,7 @@ exports.downloadCertificate = async (req, res) => {
 
     // Validate input
     if (!subcourseId) {
-      console.log('[DEBUG] Subcourse ID missing in request body');
+      console.log('[DEBUG] Subcourse ID missing in request');
       return apiResponse(res, {
         success: false,
         message: 'Subcourse ID is required',
@@ -1005,52 +1025,23 @@ exports.downloadCertificate = async (req, res) => {
     }
 
     // Check if user has completed the subcourse
-    console.log(`[DEBUG] Checking UserCourse for userId: ${userId}, subcourseId: ${subcourseId}`);
-    const userCourse = await UserCourse.findOne({ userId, subcourseId, isCompleted: true });
+    console.log(`[DEBUG] Checking UserCourse completion for userId: ${userId}, subcourseId: ${subcourseId}`);
+    const userCourse = await UserCourse.findOne({ 
+      userId, 
+      subcourseId, 
+      isCompleted: true 
+    });
+
     if (!userCourse) {
-      console.log(`[DEBUG] UserCourse not found or subcourse not completed - userId: ${userId}, subcourseId: ${subcourseId}`);
+      console.log(`[DEBUG] Subcourse not completed or not enrolled - userId: ${userId}, subcourseId: ${subcourseId}`);
       return apiResponse(res, {
         success: false,
-        message: 'Subcourse not completed or not enrolled',
+        message: 'You must complete the subcourse to download the certificate',
         statusCode: 403,
       });
     }
 
-    // Check payment status
-    console.log(`[DEBUG] Checking payment status for userId: ${userId}, subcourseId: ${subcourseId}`);
-    const certificatePayment = await CertificatePayment.findOne({ userId, subcourseId });
-    if (!certificatePayment || !certificatePayment.paymentStatus) {
-      console.log(`[DEBUG] Payment not completed for subcourseId: ${subcourseId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'Payment required to download certificate',
-        statusCode: 403,
-      });
-    }
-
-    const template = await CertificateTemplate.findOne().sort({ createdAt: -1 });
-    if (!template) {
-      console.log('[DEBUG] No certificate template found in database');
-      return apiResponse(res, {
-        success: false,
-        message: 'Certificate template not found',
-        statusCode: 404,
-      });
-    }
-
-    // Fetch user
-    console.log(`[DEBUG] Fetching user with ID: ${userId}`);
-    const user = await User.findById(userId);
-    if (!user) {
-      console.log(`[DEBUG] User not found for ID: ${userId}`);
-      return apiResponse(res, {
-        success: false,
-        message: 'User not found',
-        statusCode: 404,
-      });
-    }
-
-    // Fetch subcourse
+    // Fetch subcourse to check if certificate is free
     console.log(`[DEBUG] Fetching subcourse with ID: ${subcourseId}`);
     const subcourse = await Subcourse.findById(subcourseId);
     if (!subcourse) {
@@ -1062,55 +1053,109 @@ exports.downloadCertificate = async (req, res) => {
       });
     }
 
+    // === FREE CERTIFICATE LOGIC ===
+    const isCertificateFree = subcourse.isCertificateFree === true;
+
+    if (!isCertificateFree) {
+      // Only check payment if certificate is NOT free
+      console.log(`[DEBUG] Certificate is PAID. Checking payment status...`);
+      const certificatePayment = await CertificatePayment.findOne({ 
+        userId, 
+        subcourseId,
+        paymentStatus: true 
+      });
+
+      if (!certificatePayment) {
+        console.log(`[DEBUG] No successful payment found for subcourseId: ${subcourseId}`);
+        return apiResponse(res, {
+          success: false,
+          message: 'Payment is required to download this certificate',
+          statusCode: 403,
+        });
+      }
+      console.log('[DEBUG] Payment verified successfully for paid certificate');
+    } else {
+      console.log(`[DEBUG] Certificate is FREE for subcourse: "${subcourse.subcourseName}". Skipping payment check.`);
+    }
+
+    // Fetch latest certificate template
+    const template = await CertificateTemplate.findOne().sort({ createdAt: -1 });
+    if (!template) {
+      console.log('[DEBUG] No certificate template found in database');
+      return apiResponse(res, {
+        success: false,
+        message: 'Certificate template not configured',
+        statusCode: 404,
+      });
+    }
+
+    // Fetch user details
+    console.log(`[DEBUG] Fetching user with ID: ${userId}`);
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log(`[DEBUG] User not found for ID: ${userId}`);
+      return apiResponse(res, {
+        success: false,
+        message: 'User not found',
+        statusCode: 404,
+      });
+    }
+
     // Generate dynamic fields
     const certificateId = `LS-${uuidv4().split('-')[0].toUpperCase()}`;
     const currentDate = moment().tz('Asia/Kolkata').format('DD/MM/YYYY');
-    const certificateDescription = subcourse.certificateDescription || 'This certifies that the above-named individual has completed all required modules, assessments, and project work associated with the subcourse, demonstrating the knowledge and skills necessary in the respective field.';
-    console.log('[DEBUG] Dynamic fields generated:', { certificateId, currentDate, certificateDescription });
+    const certificateDescription = subcourse.certificateDescription || 
+      'This certifies that the above-named individual has successfully completed the subcourse and demonstrated proficiency in the subject matter.';
 
-    // Replace placeholders in the template
-    console.log('[DEBUG] Replacing placeholders in HTML template');
-    let modifiedHtmlContent = template.content;
-    console.log('[DEBUG] Original HTML content length:', modifiedHtmlContent.length);
-    modifiedHtmlContent = modifiedHtmlContent
+    console.log('[DEBUG] Generated certificate data:', { certificateId, currentDate });
+
+    // Replace placeholders in HTML template
+    console.log('[DEBUG] Applying dynamic values to certificate template');
+    let modifiedHtmlContent = template.content
       .replace(/{{username}}/g, user.fullName.toUpperCase())
       .replace(/{{subcourseName}}/g, subcourse.subcourseName)
       .replace(/{{certificateDescription}}/g, certificateDescription)
       .replace(/{{certificateId}}/g, certificateId)
       .replace(/{{currentDate}}/g, currentDate);
 
-    // Generate PDF with Puppeteer
-    console.log('[DEBUG] Generating PDF with Puppeteer');
+    // Generate PDF using Puppeteer
+    console.log('[DEBUG] Launching Puppeteer to generate PDF...');
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: 595, height: 842 });
-    await page.setContent(modifiedHtmlContent, { waitUntil: 'networkidle0' });
+    await page.setViewport({ width: 595, height: 842 }); // A4 in pixels (72dpi)
+    await page.setContent(modifiedHtmlContent, { waitUntil: 'networkidle0', timeout: 30000 });
+
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
     });
+
     await browser.close();
+    console.log('[DEBUG] PDF generated successfully. Size:', pdfBuffer.length, 'bytes');
 
-    // Update isCertificateDownloaded to true
-    console.log(`[DEBUG] Updating isCertificateDownloaded for userId: ${userId}, subcourseId: ${subcourseId}`);
-    await UserCourse.updateOne(
-      { userId, subcourseId, isCompleted: true },
-      { $set: { isCertificateDownloaded: true } }
-    );
+    // Mark certificate as downloaded (optional: only if you track this)
+    if (!userCourse.isCertificateDownloaded) {
+      await UserCourse.updateOne(
+        { userId, subcourseId },
+        { $set: { isCertificateDownloaded: true, certificateDownloadedAt: new Date() } }
+      );
+      console.log('[DEBUG] Marked certificate as downloaded in UserCourse');
+    }
 
-    console.log('[DEBUG] PDF generated successfully, buffer length:', pdfBuffer.length);
+    // Send PDF as download
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="certificate_${certificateId}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Certificate_${certificateId}.pdf"`);
     res.send(pdfBuffer);
+
   } catch (error) {
-    console.error('[DEBUG] Error in downloadCertificate:', error);
+    console.error('[ERROR] downloadCertificate failed:', error);
     return apiResponse(res, {
       success: false,
-      message: `Error generating certificate: ${error.message}`,
+      message: 'Failed to generate certificate. Please try again later.',
       statusCode: 500,
     });
   }

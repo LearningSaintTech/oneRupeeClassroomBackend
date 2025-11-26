@@ -568,19 +568,19 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
     }
 
     // Check if subcourse is completed by user
-    const userSubcourseProgress = await UserSubcourseProgress.findOne({
-      userId,
-      subcourseId,
-      isCompleted: true,
-    });
+    // const userSubcourseProgress = await UserSubcourseProgress.findOne({
+    //   userId,
+    //   subcourseId,
+    //   isCompleted: true,
+    // });
 
-    if (!userSubcourseProgress) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Subcourse not completed',
-        statusCode: 403,
-      });
-    }
+    // if (!userSubcourseProgress) {
+    //   return apiResponse(res, {
+    //     success: false,
+    //     message: 'Subcourse not completed',
+    //     statusCode: 403,
+    //   });
+    // }
 
     // Check existing internship letter request
     let internshipLetter = await InternshipLetter.findOne({ userId, subcourseId });
