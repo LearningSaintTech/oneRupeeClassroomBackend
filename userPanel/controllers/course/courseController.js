@@ -1156,7 +1156,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
 
     // Fetch subcourse with required fields
     const subcourse = await Subcourse.findById(subcourseId).select(
-      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId internshipLetterPrice appleInternshipProductId isCertificateFree'
+      'subcourseName certificateDescription certificatePrice appleCertificateProductId appleRecordedProductId internshipLetterPrice appleInternshipProductId isCertificateFree isInternshipLetterFree'
     );
 
     if (!subcourse) {
@@ -1194,6 +1194,7 @@ exports.getSubcourseNameAndCertDesc = async (req, res) => {
       appleRecordedProductId: subcourse.appleRecordedProductId,
       isPaymentDone,
       isCertificateFree:subcourse.isCertificateFree,
+      isInternshipLetterFree:subcourse.isInternshipLetterFree,
 
       // === INTERNSHIP LETTER FIELDS ===
       internshipLetterPrice: subcourse.internshipLetterPrice || 0,
