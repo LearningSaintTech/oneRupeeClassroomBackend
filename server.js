@@ -39,6 +39,7 @@ const twofactorRoutes = require('./twofactor/routes/twofactorRoutes');
 const recordedLessonRoutes = require("./userPanel/routes/recordedLessonRoutes");
 const activityRoutes = require("./adminPanel/routes/activityRoutes");
 const userActivityRoutes = require("./userPanel/routes/activityRoutes")
+const chatBotRoutes = require("./AI-Chatbot/routes/chatRoutes")
 
 
 require('dotenv').config();
@@ -111,6 +112,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+
+const session = require('express-session');
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'gyan-o-bot-super-secret-key',
+  resave: false,               // don't save session if unmodified
+  saveUninitialized: false,    // don't create session until something stored
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
+    httpOnly: true
+  }
+}));
+
+
 // User Routes
 app.use('/api/auth', authRoutes, verifyemailRoutes);
 app.use("/api/user/profile", profileRoutes);
@@ -128,6 +144,9 @@ app.use("/api/user/activites",userActivityRoutes)
 
 // NEW: 2Factor Routes
 app.use('/api/2factor', twofactorRoutes);
+
+//chat bot
+app.use("/api/chatbot",chatBotRoutes)
 
 // Admin Routes
 app.use("/api/admin/auth", adminauthRoutes);
