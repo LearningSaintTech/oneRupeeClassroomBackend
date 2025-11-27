@@ -37,6 +37,8 @@ const eventNames = require('./socket/eventNames');
 const NotificationCleanup = require('./cron/clearNotification');
 const twofactorRoutes = require('./twofactor/routes/twofactorRoutes'); 
 const recordedLessonRoutes = require("./userPanel/routes/recordedLessonRoutes");
+const activityRoutes = require("./adminPanel/routes/activityRoutes");
+const userActivityRoutes = require("./userPanel/routes/activityRoutes")
 
 
 require('dotenv').config();
@@ -121,7 +123,8 @@ app.use("/api/user/search", searchRoutes);
 app.use("/api/user/certificate", downloadCertificateRoutes);
 app.use("/api/user/internshipLetter", InternshipLetter);
 app.use("/api/notification", notificationRoutes);
-app.use("/api/user/recordedLessons",recordedLessonRoutes)
+app.use("/api/user/recordedLessons",recordedLessonRoutes);
+app.use("/api/user/activites",userActivityRoutes)
 
 // NEW: 2Factor Routes
 app.use('/api/2factor', twofactorRoutes);
@@ -140,6 +143,7 @@ app.use("/api/admin/ratings", getAllRatings);
 app.use("/api/admin/upload", uploadInternshipLetter);
 app.use("/api/admin/payments", paymentRoutes);
 app.use("/api/promo", promoRoutes);
+app.use("/api/admin/activities",activityRoutes);
 
 // Start server
 server.listen(PORT, () => {
