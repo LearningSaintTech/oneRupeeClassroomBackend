@@ -1,5 +1,5 @@
-const {uploadImage} = require("./utils/s3Functions");
-const {apiResponse} = require("./utils/apiResponse");
+const {uploadImage} = require("../utils/s3Functions");
+const {apiResponse} = require("../utils/apiResponse");
 
 // Express Controller for Image Upload
 exports.imageUploadController = async (req, res) => {
