@@ -6,7 +6,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
-const {imageUploadController} = require("../../uploloadImages");
+const {imageUploadController} = require("../../other_modules/uploloadImages");
 
 // router.post('/create-profile', verifyToken,upload.single('profileImageUrl'),createUserProfile);
 router.put('/update-profile',verifyToken,upload.single('profileImageUrl'), updateUserProfile);
