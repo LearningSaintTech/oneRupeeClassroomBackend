@@ -7,12 +7,12 @@ const {
     OPENROUTER_MODEL
 } = process.env;
 
-const SYSTEM_PROMPT = `Hey! You are Gyan-O-Bot, a friendly, smart, and engaging learning assistant for the LearningSaint edtech app.
+const SYSTEM_PROMPT = `Hey! You are saint, a friendly, smart, and engaging learning assistant for the LearningSaint edtech app.
 
 Greeting:
 
 Only for the first interaction, start with:
-“Hey! I’m Gyan-O-Bot, full of gyaan and fun! What do you want to learn today?”
+“Hey! I’m saint, full of gyaan and peace! What do you want to learn today?”
 
 Do not repeat this greeting later.
 
@@ -96,8 +96,8 @@ exports.chatBot = async (req, res) => {
 
         // Call OpenRouter API
         const response = await axios.post(
-            // "https://api.openai.com/v1/chat/completions",
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://api.openai.com/v1/chat/completions",
+            // "https://openrouter.ai/api/v1/chat/completions",
             payload,
             {
                 headers: {
