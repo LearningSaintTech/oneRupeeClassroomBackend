@@ -159,3 +159,61 @@ exports.chatBot = async (req, res) => {
         });
     }
 };
+
+
+
+
+exports.readAloud = async (req, res) => {
+    try {
+        const { text, voice = "alloy" } = req.body;
+
+        if (!text || text.trim() === "") {
+            return apiResponse(res, {
+                success: false,
+                message: "Text is required for speech",
+                statusCode: 400
+            });
+        }
+
+        console.log("Generating speech for:", text.substring(0, 60) + "...");
+
+        const ttsResponse = await axios.post(
+            "https://api.openai.com/v1/audio/speech",
+            {
+                model: "gpt-4o-mini-tts",
+                voice: voice,                // alloy, echo, fable, onyx, nova, shimmer
+                input: text.trim(),
+                format: "mp3"               // ✅ Correct key
+                // ❌ response_format is WRONG → not needed
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                responseType: "arraybuffer", // ⚠️ MUST be arraybuffer for audio
+                timeout: 30000
+            }
+        );
+
+        // Convert audio to Base64
+        const audioBase64 = Buffer.from(ttsResponse.data).toString("base64");
+        const audioUrl = `data:audio/mp3;base64,${audioBase64}`;
+
+        return apiResponse(res, {
+            success: true,
+            message: "Audio ready!",
+            data: { audioUrl },
+            statusCode: 200
+        });
+
+    } catch (error) {
+        console.error("ReadAloud Error:", error.response?.data || error.message);
+
+        return apiResponse(res, {
+            success: false,
+            message: "Audio generation failed",
+            statusCode: 500
+        });
+    }
+};
