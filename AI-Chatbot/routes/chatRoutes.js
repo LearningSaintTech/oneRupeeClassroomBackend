@@ -4,7 +4,7 @@ const router = express.Router();
 const {verifyToken} = require("../../middlewares/authMiddleware")
 
 
-router.post('/chat',chatBot)
-router.post('/speak',readAloud)
+router.post('/chat',verifyToken,chatBot)
+router.post('/speak',verifyToken,readAloud)
 
  module.exports = router
