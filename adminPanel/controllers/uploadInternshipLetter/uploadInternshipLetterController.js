@@ -7,6 +7,7 @@ const path = require('path');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
 const Admin = require('../../models/Auth/auth');
 const { emitUploadInternshipLetter } = require('../../../socket/emitters');
+const subCourse = require("../../models/course/subcourse")
 
 // Upload Internship Letter and Update Status
 exports.uploadInternshipLetter = async (req, res) => {
@@ -102,11 +103,12 @@ exports.uploadInternshipLetter = async (req, res) => {
     });
 
     // Fetch course details for notification
-    let courseTitle = internshipLetter.courseId.toString();
+    let courseTitle = internshipLetter.subcourseId.toString();
     try {
-      const course = await Course.findById(internshipLetter.courseId).select('title');
+      const course = await subCourse.findById(internshipLetter.subcourseId).select('subcourseName');
+      console.log("2222",course)
       if (course) {
-        courseTitle = course.title;
+        courseTitle = course.subcourseName;
       } else {
         console.log('🔔 [uploadInternshipLetter] Course not found, using courseId:', {
           courseId: internshipLetter.courseId,
@@ -126,7 +128,7 @@ exports.uploadInternshipLetter = async (req, res) => {
         type: 'internship_letter_uploaded',
         data: {
           internshipLetterId: internshipLetter._id,
-          courseId: internshipLetter.courseId,
+          courseId: internshipLetter.subcourseId,
           userId: internshipLetter.userId,
         },
         createdAt: new Date(),
