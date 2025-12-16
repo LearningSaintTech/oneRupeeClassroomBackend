@@ -211,14 +211,14 @@ exports.deleteCourse = async (req, res) => {
       });
     }
 
-    // Check admin authorization
-    if (course.adminId.toString() !== req.userId) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Unauthorized to delete this course',
-        statusCode: 403,
-      });
-    }
+    // // Check admin authorization
+    // if (course.adminId.toString() !== req.userId) {
+    //   return apiResponse(res, {
+    //     success: false,
+    //     message: 'Unauthorized to delete this course',
+    //     statusCode: 403,
+    //   });
+    // }
 
     // Find all subcourses for this course
     const subcourses = await Subcourse.find({ courseId });
