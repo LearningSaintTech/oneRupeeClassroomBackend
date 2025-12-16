@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// const User = require('../models/User');
+const User = require('../../../userPanel/models/Auth/Auth');
 const UsermainCourse = require('../../../userPanel/models/UserCourse/usermainCourse');
 // const UserProfile = require('../models/UserProfile');
 const { apiResponse } = require('../../../utils/apiResponse');
@@ -299,6 +299,75 @@ exports.searchUsers = async (req, res) => {
       success: false,
       message: 'Error searching users who purchased main courses',
       data: null,
+      statusCode: 500
+    });
+  }
+};
+
+
+exports.getUsersNoSubcoursePurchase = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get users with no subcourse purchase using aggregate to include profile info
+    const usersNoPurchase = await User.aggregate([
+      {
+        $match: { purchasedsubCourses: { $size: 0 } }
+      },
+      {
+        $lookup: {
+          from: 'userprofiles',
+          localField: '_id',
+          foreignField: 'userId',
+          as: 'profile'
+        }
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      {
+        $sort: { createdAt: -1 }
+      },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          fullName: 1,
+          mobileNumber: 1,
+          email: '$profile.email',
+          profileImageUrl: '$profile.profileImageUrl'
+        }
+      }
+    ]);
+
+    // Get total count
+    const totalUsersNoPurchase = await User.countDocuments({ purchasedsubCourses: { $size: 0 } });
+
+    return apiResponse(res, {
+      success: true,
+      message: 'Users with no subcourse purchased retrieved successfully',
+      data: {
+        users: usersNoPurchase.map((item, index) => ({
+          sno: skip + index + 1,
+          name: item.fullName,
+          phone: item.mobileNumber,
+          email: item.email || 'N/A',
+          profileImageUrl: item.profileImageUrl || 'N/A'
+        })),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalUsersNoPurchase / limit),
+          totalUsers: totalUsersNoPurchase,
+          limit
+        }
+      },
+      statusCode: 200
+    });
+  } catch (error) {
+    console.error('Error fetching users with no subcourse purchase:', error);
+    return apiResponse(res, {
+      success: false,
+      message: 'Error fetching no-purchase user list',
       statusCode: 500
     });
   }

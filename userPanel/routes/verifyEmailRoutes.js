@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const {sendOTPEmail, verifyOTP,resendOTP } = require('../controllers/verifyEmail/verifyEmailController');
-const {verifyToken} = require('../../middlewares/authMiddleware'); 
+const {verifyUser} = require('../../middlewares/authMiddleware'); 
 
-router.post('/send-emailotp', verifyToken, sendOTPEmail);
-router.post('/verify-emailOtp', verifyToken, verifyOTP);
-router.post('/resend-emailOtp', verifyToken, resendOTP);
+router.post('/send-emailotp', verifyUser, sendOTPEmail);
+router.post('/verify-emailOtp', verifyUser, verifyOTP);
+router.post('/resend-emailOtp', verifyUser, resendOTP);
 
 module.exports = router;

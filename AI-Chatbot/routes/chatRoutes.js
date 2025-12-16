@@ -6,5 +6,4 @@ const {verifyToken} = require("../../middlewares/authMiddleware")
 
 router.post('/chat',verifyToken,chatBot)
 router.post('/speak',verifyToken,readAloud)
-
- module.exports = router
+module.exports = router

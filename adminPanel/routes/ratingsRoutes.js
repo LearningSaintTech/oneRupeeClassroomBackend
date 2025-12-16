@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const {getAllSubcourseNameAndAvgRating,searchSubcoursesByKeyword,exportSubcoursesToCsv} = require('../controllers/getAllRatings/ratingsController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const { verifyAdmin } = require('../../middlewares/authMiddleware');
 
 
 
 
 
 // Routes
-router.get('/get-ratings', verifyToken, getAllSubcourseNameAndAvgRating);
-router.get('/search-ratings', verifyToken,searchSubcoursesByKeyword);
-router.get('/export-ratings', verifyToken, exportSubcoursesToCsv);
+router.get('/get-ratings', verifyAdmin, getAllSubcourseNameAndAvgRating);
+router.get('/search-ratings', verifyAdmin,searchSubcoursesByKeyword);
+router.get('/export-ratings', verifyAdmin, exportSubcoursesToCsv);
 
 
 module.exports = router;
