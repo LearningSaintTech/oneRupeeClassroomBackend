@@ -11,6 +11,17 @@ const { s3 } = require("../config/s3");
 
 const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5MB
 
+// Helper function to generate public file URL (CloudFront or S3)
+const getPublicFileUrl = (fileName) => {
+  const cdnBase = process.env.CDN_BASE_URL;
+  if (cdnBase && cdnBase.trim() !== "") {
+    // Use CloudFront / CDN domain
+    return `${cdnBase.replace(/\/+$/, "")}/${fileName}`;
+  }
+  // Fallback to direct S3 URL if CDN not configured
+  return `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${fileName}`;
+};
+
 // Internal helper for multipart upload
 const multipartUpload = async (file, fileName) => {
   const uploadInit = await s3.send(
@@ -98,7 +109,7 @@ exports.uploadImage = async (file, fileName) => {
       await s3.send(new PutObjectCommand(uploadParams));
     }
 
-    const fileUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${fileName}`;
+    const fileUrl = getPublicFileUrl(fileName);
     console.log("✅ Uploaded File URL:", fileUrl);
     return fileUrl;
   } catch (error) {
@@ -154,10 +165,7 @@ exports.uploadMultipleImages = async (files, fileNames) => {
 
     await Promise.all(uploadPromises);
 
-    const fileUrls = fileNames.map(
-      (fileName) =>
-        `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${fileName}`
-    );
+    const fileUrls = fileNames.map((fileName) => getPublicFileUrl(fileName));
 
     return fileUrls;
   } catch (error) {
