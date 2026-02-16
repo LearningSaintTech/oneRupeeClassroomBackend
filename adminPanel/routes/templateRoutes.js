@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {uploadTemplate } = require('../controllers/TemplateUpload/certificateTemplateController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const { verifyAdmin } = require('../../middlewares/authMiddleware');
 
 
 // Routes
-router.post('/upload-certificateTemplate', verifyToken, uploadTemplate);
+router.post('/upload-certificateTemplate', verifyAdmin, uploadTemplate);
 
 
 module.exports = router;

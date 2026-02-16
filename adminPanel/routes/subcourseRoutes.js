@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createSubcourse, getAllSubcourses, updateSubcourse, deleteSubcourse ,searchSubcourses,getSubcoursesByCourseId,addRecordedLessons,updateRecordedLessons,getRecordedLessons} = require('../controllers/course/subcourseController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const { verifyAdmin } = require('../../middlewares/authMiddleware');
 const multer = require('multer');
 
 
@@ -12,15 +12,15 @@ const uploadFields = upload.fields([
 ]);
 
 // Routes
-router.post('/add-subcourse', verifyToken, uploadFields, createSubcourse);
-router.get('/get-all-subcourses', verifyToken, getAllSubcourses);
-router.put('/update-subcourse/:id', verifyToken, uploadFields, updateSubcourse);
-router.delete("/delete-subcourse/:id", verifyToken, deleteSubcourse);
-router.get("/search-subcourse",verifyToken,searchSubcourses);
+router.post('/add-subcourse', verifyAdmin, uploadFields, createSubcourse);
+router.get('/get-all-subcourses', verifyAdmin, getAllSubcourses);
+router.put('/update-subcourse/:id', verifyAdmin, uploadFields, updateSubcourse);
+router.delete("/delete-subcourse/:id", verifyAdmin, deleteSubcourse);
+router.get("/search-subcourse",verifyAdmin,searchSubcourses);
 
-router.get("/get-subCoursesById/:courseId",verifyToken,getSubcoursesByCourseId)
+router.get("/get-subCoursesById/:courseId",verifyAdmin,getSubcoursesByCourseId)
 
-router.put('/update-recorded-lessons/:id', verifyToken,updateRecordedLessons);
-router.post('/add-recorded-lessons/:id', verifyToken,addRecordedLessons);
-router.get('/get-recorded-lessons/:id',verifyToken, getRecordedLessons);
+router.put('/update-recorded-lessons/:id', verifyAdmin,updateRecordedLessons);
+router.post('/add-recorded-lessons/:id', verifyAdmin,addRecordedLessons);
+router.get('/get-recorded-lessons/:id',verifyAdmin, getRecordedLessons);
 module.exports = router;

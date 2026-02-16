@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../../middlewares/authMiddleware');
+const { verifyAdmin } = require('../../middlewares/authMiddleware');
 const { getCompletedPayments } = require('../controllers/payment/paymentController');
 
 // GET /api/admin/payments
-router.get('/', verifyToken, getCompletedPayments);
+router.get('/', verifyAdmin, getCompletedPayments);
 
 module.exports = router;
 
