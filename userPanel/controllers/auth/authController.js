@@ -10,9 +10,9 @@ const generateOTP = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// Validate mobile number format (+91 followed by 10 digits)
+// Accept international mobile numbers in E.164 format
 const validateMobile = (mobileNumber) => {
-  return /^\+91\d{10}$/.test(mobileNumber);
+  return /^\+[1-9]\d{7,14}$/.test(String(mobileNumber || '').trim());
 };
 
 // Function to create and save OTP
@@ -43,7 +43,7 @@ exports.register = async (req, res) => {
   if (!validateMobile(mobileNumber)) {
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -96,7 +96,7 @@ exports.login = async (req, res) => {
   if (!validateMobile(mobileNumber)) {
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -142,7 +142,7 @@ exports.verifyOTP = async (req, res) => {
   if (!validateMobile(mobileNumber)) {
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -209,7 +209,7 @@ exports.resendOTP = async (req, res) => {
   if (!validateMobile(mobileNumber)) {
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -267,7 +267,7 @@ exports.firebaseRegister = async (req, res) => {
     console.log('firebaseRegister: Invalid mobile number format', { mobileNumber });
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -349,7 +349,7 @@ exports.firebaseLogin = async (req, res) => {
     console.log('firebaseLogin: Invalid mobile number format', { mobileNumber });
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -401,7 +401,7 @@ exports.firebaseVerifyOTP = async (req, res) => {
     console.log('firebaseVerifyOTP: Invalid mobile number format', { mobileNumber });
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }
@@ -483,7 +483,7 @@ exports.firebaseResendOTP = async (req, res) => {
     console.log('firebaseResendOTP: Invalid mobile number format', { mobileNumber });
     return apiResponse(res, {
       success: false,
-      message: 'Mobile number must start with +91 and be followed by 10 digits',
+      message: 'Mobile number must be valid with country code (e.g. +919876543210)',
       statusCode: 400,
     });
   }

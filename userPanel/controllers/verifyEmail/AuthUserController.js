@@ -431,25 +431,11 @@ exports.refreshTokenHandler = async (req, res) => {
 // POST /user-auth/resend-otp/email
 exports.resendOTP = async (req, res) => {
   try {
-    const { email, mobileNumber } = req.body;
+    const { email,  } = req.body;
 
-    if (!mobileNumber || typeof mobileNumber !== 'string') {
-      return apiResponse(res, {
-        success: false,
-        message: 'Mobile number is required',
-        statusCode: 400,
-      });
-    }
+   
 
-    const trimmedMobile = mobileNumber.trim();
-
-    if (!validateMobile(trimmedMobile)) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Mobile number must be valid with country code (e.g. +919876543210)',
-        statusCode: 400,
-      });
-    }
+   
 
     if (!isValidEmail(email)) {
       return apiResponse(res, {
@@ -471,13 +457,7 @@ exports.resendOTP = async (req, res) => {
       });
     }
 
-    if (String(user.mobileNumber || '').trim() !== trimmedMobile) {
-      return apiResponse(res, {
-        success: false,
-        message: 'Email and mobile number do not match',
-        statusCode: 400,
-      });
-    }
+   
 
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -495,7 +475,7 @@ exports.resendOTP = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'OTP resent successfully',
-      data: { email: trimmedEmail, mobileNumber: trimmedMobile },
+      data: { email: trimmedEmail },
       statusCode: 200,
     });
   } catch (error) {
