@@ -6,6 +6,7 @@ const { Server } = require("socket.io");
 const mongoose = require('mongoose');
 
 const authRoutes = require('./userPanel/routes/authRoutes');
+const userAuthRoutes = require('./userPanel/routes/userAuthRoutes');
 const adminauthRoutes = require("./adminPanel/routes/authRoutes");
 const courseRoutes = require("./adminPanel/routes/courseRoutes");
 const subcourseRoutes = require("./adminPanel/routes/subcourseRoutes");
@@ -128,7 +129,8 @@ app.use(session({
 
 
 // User Routes
-app.use('/api/auth', authRoutes, verifyemailRoutes);
+// /api/auth -> mobile auth, email verification, and email-based auth
+app.use('/api/auth', authRoutes, verifyemailRoutes, userAuthRoutes);
 app.use("/api/user/profile", profileRoutes);
 app.use("/api/user/course", userSideCourseRoutes, userCourseRoutes);
 app.use('/api/user/favorite', favouriteCourseRoutes);

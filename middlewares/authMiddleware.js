@@ -3,6 +3,21 @@ const User = require('../userPanel/models/Auth/Auth');
 const Admin = require('../adminPanel/models/Auth/auth');
 const { apiResponse } = require('../utils/apiResponse');
 
+// Helper to verify token against access/legacy secrets
+const verifyJwtWithSecrets = (token) => {
+    const secrets = [process.env.ACCESS_SECRET, process.env.JWT_SECRET].filter(Boolean);
+
+    for (const secret of secrets) {
+        try {
+            return jwt.verify(token, secret);
+        } catch (e) {
+            // try next
+        }
+    }
+
+    throw new Error('Invalid or expired token');
+};
+
 // Basic token verification (existing - works for both)
 const verifyToken = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -16,7 +31,7 @@ const verifyToken = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = verifyJwtWithSecrets(token);
         req.userId = decoded.userId;
         next();
     } catch (error) {
@@ -41,7 +56,7 @@ const verifyUser = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = verifyJwtWithSecrets(token);
         
         // Check if it's an admin trying to access user route
         const admin = await Admin.findById(decoded.userId);
@@ -88,7 +103,7 @@ const verifyAdmin = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = verifyJwtWithSecrets(token);
         
         // Check if it's a user trying to access admin route
         const user = await User.findById(decoded.userId);

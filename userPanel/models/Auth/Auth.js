@@ -5,18 +5,18 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Full name is required'],
     },
-    mobileNumber: {
+    email: {
         type: String,
-        required: [true, 'Mobile number is required'],
+        required: [true, 'Email is required'],
         unique: true,
         validate: {
             validator: function (value) {
-                return /^\+91\d{10}$/.test(value); // Validates +91 followed by 10 digits
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); // Validates email
             },
-            message: 'Mobile number must start with +91 and be followed by 10 digits',
+            message: 'Email must be a valid email address',
         },
     },
-    isNumberVerified: {
+    isEmailVerified: {
         type: Boolean,
         default: false,
     },
@@ -24,10 +24,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: "user"
     },
-    isEmailVerified: {
-        type: Boolean,
-        default: false
-    },
+    
     purchasedsubCourses:
         [
             {

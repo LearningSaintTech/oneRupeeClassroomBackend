@@ -26,28 +26,100 @@ const generateEmailTemplate = (otp) => {
     <html>
     <head>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
-            .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
-            .header { background: #007bff; color: white; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { padding: 20px; text-align: center; }
-            .otp { font-size: 24px; font-weight: bold; color: #333; margin: 20px 0; }
-            .note { color: #666; font-size: 14px; }
-            .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 12px; }
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #f5f7fb;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .wrapper {
+                width: 100%;
+                padding: 20px;
+                background-color: #f5f7fb;
+            }
+            .container {
+                max-width: 600px;
+                margin: auto;
+                background: #ffffff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            .header {
+                background: linear-gradient(135deg, #4e73df, #224abe);
+                padding: 20px;
+                text-align: center;
+                color: #ffffff;
+            }
+            .header h1 {
+                margin: 0;
+                font-size: 22px;
+            }
+            .content {
+                padding: 30px 20px;
+                text-align: center;
+            }
+            .content h2 {
+                margin-bottom: 10px;
+                color: #333;
+            }
+            .content p {
+                color: #666;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+            .otp-box {
+                display: inline-block;
+                margin: 20px 0;
+                padding: 15px 25px;
+                font-size: 28px;
+                letter-spacing: 4px;
+                font-weight: bold;
+                color: #224abe;
+                background: #f1f4ff;
+                border-radius: 8px;
+                border: 1px dashed #4e73df;
+            }
+            .warning {
+                margin-top: 15px;
+                font-size: 13px;
+                color: #999;
+            }
+            .footer {
+                background: #f9fafc;
+                text-align: center;
+                padding: 15px;
+                font-size: 12px;
+                color: #aaa;
+                border-top: 1px solid #eee;
+            }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h2>Email Verification</h2>
-            </div>
-            <div class="content">
-                <h3>Your One-Time Password (OTP)</h3>
-                <p class="otp">${otp}</p>
-                <p>Use this code to verify your email address. This OTP is valid for <strong>1 minute</strong>.</p>
-                <p class="note">If you didn't request this, please ignore this email.</p>
-            </div>
-            <div class="footer">
-                <p>&copy; ${new Date().getFullYear()} Learning Saint. All rights reserved.</p>
+        <div class="wrapper">
+            <div class="container">
+                
+                <div class="header">
+                    <h1>Email Verification</h1>
+                </div>
+
+                <div class="content">
+                    <h2>Your OTP Code</h2>
+                    <p>Use the following One-Time Password to complete your verification process.</p>
+
+                    <div class="otp-box">${otp}</div>
+
+                    <p>This OTP is valid for <strong>1 minute</strong>.</p>
+
+                    <p class="warning">
+                        If you did not request this, you can safely ignore this email.
+                    </p>
+                </div>
+
+                <div class="footer">
+                    &copy; ${new Date().getFullYear()} Learning Saint. All rights reserved.
+                </div>
+
             </div>
         </div>
     </body>
