@@ -17,6 +17,12 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 };
 
+// Same rule as mobile OTP auth: +91 followed by 10 digits
+const validateMobile = (mobileNumber) => {
+  const m = String(mobileNumber || '').trim();
+  return /^\+91\d{10}$/.test(m);
+};
+
 // Nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
@@ -58,12 +64,33 @@ const getDeviceId = (req) => {
 // POST /user-auth/register/email
 exports.register = async (req, res) => {
   try {
-    const { fullName, email } = req.body;
+    const { fullName,  email, mobileNumber } = req.body;
+    console.log( "fullName", fullName);
+    console.log( "email", email);
+    console.log( "mobileNumber", mobileNumber); 
 
     if (!fullName || typeof fullName !== 'string') {
       return apiResponse(res, {
         success: false,
         message: 'Full name is required',
+        statusCode: 400,
+      });
+    }
+
+    if (!mobileNumber || typeof mobileNumber !== 'string') {
+      return apiResponse(res, {
+        success: false,
+        message: 'Mobile number is required',
+        statusCode: 400,
+      });
+    }
+
+    const trimmedMobile = mobileNumber.trim();
+
+    if (!validateMobile(trimmedMobile)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Mobile number must start with +91 and be followed by 10 digits',
         statusCode: 400,
       });
     }
@@ -78,6 +105,18 @@ exports.register = async (req, res) => {
 
     const trimmedEmail = email.trim().toLowerCase();
 
+    const mobileTakenOtherEmail = await User.findOne({
+      mobileNumber: trimmedMobile,
+      email: { $ne: trimmedEmail },
+    });
+    if (mobileTakenOtherEmail) {
+      return apiResponse(res, {
+        success: false,
+        message: 'This mobile number is already registered with another email',
+        statusCode: 400,
+      });
+    }
+
     let user = await User.findOne({ email: trimmedEmail });
 
     if (user && user.isEmailVerified) {
@@ -89,10 +128,26 @@ exports.register = async (req, res) => {
     }
 
     if (user) {
+      const mobileClash = await User.findOne({
+        mobileNumber: trimmedMobile,
+        _id: { $ne: user._id },
+      });
+      if (mobileClash) {
+        return apiResponse(res, {
+          success: false,
+          message: 'This mobile number is already registered with another email',
+          statusCode: 400,
+        });
+      }
       user.fullName = fullName;
+      user.mobileNumber = trimmedMobile;
       await user.save();
     } else {
-      user = new User({ fullName, email: trimmedEmail });
+      user = new User({
+        fullName,
+        email: trimmedEmail,
+        mobileNumber: trimmedMobile,
+      });
       await user.save();
     }
 
@@ -113,7 +168,7 @@ exports.register = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'OTP sent for email registration',
-      data: { email: trimmedEmail },
+      data: { email: trimmedEmail, mobileNumber: trimmedMobile },
       statusCode: 200,
     });
   } catch (error) {
@@ -376,7 +431,25 @@ exports.refreshTokenHandler = async (req, res) => {
 // POST /user-auth/resend-otp/email
 exports.resendOTP = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, mobileNumber } = req.body;
+
+    if (!mobileNumber || typeof mobileNumber !== 'string') {
+      return apiResponse(res, {
+        success: false,
+        message: 'Mobile number is required',
+        statusCode: 400,
+      });
+    }
+
+    const trimmedMobile = mobileNumber.trim();
+
+    if (!validateMobile(trimmedMobile)) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Mobile number must start with +91 and be followed by 10 digits',
+        statusCode: 400,
+      });
+    }
 
     if (!isValidEmail(email)) {
       return apiResponse(res, {
@@ -398,6 +471,14 @@ exports.resendOTP = async (req, res) => {
       });
     }
 
+    if (String(user.mobileNumber || '').trim() !== trimmedMobile) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Email and mobile number do not match',
+        statusCode: 400,
+      });
+    }
+
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -414,7 +495,7 @@ exports.resendOTP = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'OTP resent successfully',
-      data: { email: trimmedEmail },
+      data: { email: trimmedEmail, mobileNumber: trimmedMobile },
       statusCode: 200,
     });
   } catch (error) {
