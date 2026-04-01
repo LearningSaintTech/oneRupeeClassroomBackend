@@ -17,10 +17,10 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 };
 
-// Same rule as mobile OTP auth: +91 followed by 10 digits
+// Accept international format from UI (E.164 style): + followed by 8-15 digits
 const validateMobile = (mobileNumber) => {
   const m = String(mobileNumber || '').trim();
-  return /^\+91\d{10}$/.test(m);
+  return /^\+[1-9]\d{7,14}$/.test(m);
 };
 
 // Nodemailer transporter
@@ -90,7 +90,7 @@ exports.register = async (req, res) => {
     if (!validateMobile(trimmedMobile)) {
       return apiResponse(res, {
         success: false,
-        message: 'Mobile number must start with +91 and be followed by 10 digits',
+        message: 'Mobile number must be valid with country code (e.g. +919876543210)',
         statusCode: 400,
       });
     }
@@ -446,7 +446,7 @@ exports.resendOTP = async (req, res) => {
     if (!validateMobile(trimmedMobile)) {
       return apiResponse(res, {
         success: false,
-        message: 'Mobile number must start with +91 and be followed by 10 digits',
+        message: 'Mobile number must be valid with country code (e.g. +919876543210)',
         statusCode: 400,
       });
     }
