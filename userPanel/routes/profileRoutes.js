@@ -8,18 +8,19 @@ const router = express.Router();
 
 const {imageUploadController} = require("../../other_modules/uploloadImages");
 
-// router.post('/create-profile', verifyToken,upload.single('profileImageUrl'),createUserProfile);
-router.put('/update-profile',verifyUser,upload.single('profileImageUrl'), updateUserProfile);
-router.get('/get-profile', verifyUser,getUserProfile);
-router.get("/getUser-basicInfo",verifyUser,getUserbasicInfo)
-router.get("/getProfileInfo",verifyUser,getProfileInfo)
+// Create Profile API
+router.post('/create-profile', verifyUser, upload.single('profileImageUrl'), createUserProfile);
 
-router.delete("/delete-profile",verifyUser,deleteUserProfile)
-
-router.post("/upload-image",upload.single('logo'),imageUploadController)
-
-
-
-
+// Existing APIs
+router.put('/update-profile', verifyUser, upload.single('profileImageUrl'), updateUserProfile);
+router.get('/get-profile', verifyUser, getUserProfile);
+router.get("/getUser-basicInfo", verifyUser, getUserbasicInfo);
+router.get("/getProfileInfo", verifyUser, getProfileInfo);
+router.delete("/delete-profile", verifyUser, deleteUserProfile);
+router.post("/upload-image", upload.single('logo'), imageUploadController);
 
 module.exports = router;
+
+
+
+

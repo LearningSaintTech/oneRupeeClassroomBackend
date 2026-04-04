@@ -1,0 +1,203 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-user-profile-collection",
+    "name": "User Panel — Profile API",
+    "description": "User profile routes mounted at `/api/user/profile` (see `server.js`).\n\n**Auth:** `Authorization: Bearer <token>` — JWT must decode to `userId` (see `middlewares/authMiddleware.js` `verifyUser`). Set `userToken` in the environment (e.g. from `POST {{baseUrl}}/api/auth/login`).\n\n**Multipart:** `create-profile` and `update-profile` use `upload.single('profileImageUrl')`. Prefer **JSON** body when testing without a file (Express `express.json()` runs before the route; multer leaves JSON bodies intact). For **form-data** with a file, send nested fields (`address`, `education`, `learningGoals`, `skills`) as JSON strings if your client sends multipart, or match how your mobile/web app serializes them.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "userToken", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{userToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Prerequisite — OTP auth (get token)",
+      "item": [
+        {
+          "name": "POST Login (request OTP)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobileNumber\": \"+919876543210\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Sends OTP for a registered, verified mobile (`authController.login`). Response may include `data.otp` in dev — use it in **Verify OTP**."
+          }
+        },
+        {
+          "name": "POST Verify OTP (get JWT)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobileNumber\": \"+919876543210\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/verify-otp",
+            "description": "Returns `data.token` (JWT). Paste into environment `userToken` without the word `Bearer` — the collection auth adds Bearer automatically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "POST Create profile (JSON, no image)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"gender\": \"male\",\n  \"dateOfBirth\": \"1995-06-15\",\n  \"bio\": \"Learner\",\n  \"address\": {\n    \"country\": \"India\",\n    \"state\": \"Maharashtra\",\n    \"city\": \"Mumbai\"\n  },\n  \"education\": {\n    \"highestQualification\": \"B.Tech\",\n    \"collegeName\": \"Example College\",\n    \"fieldOfStudy\": \"Computer Science\",\n    \"graduationYear\": 2020\n  },\n  \"learningGoals\": [\"Learn Node.js\", \"Build APIs\"],\n  \"skills\": [\"JavaScript\", \"Node.js\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/user/profile/create-profile",
+            "description": "Creates `UserProfile` for the authenticated user. Fails with 409 if a profile already exists (`profileController.createUserProfile`).\n\nSchema reference: `userPanel/models/Profile/userProfile.js` — `gender`: male | female | other."
+          }
+        },
+        {
+          "name": "POST Create profile (multipart + profile image)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "email", "value": "user@example.com", "type": "text" },
+                { "key": "gender", "value": "male", "type": "text" },
+                { "key": "dateOfBirth", "value": "1995-06-15", "type": "text" },
+                { "key": "bio", "value": "Learner", "type": "text" },
+                {
+                  "key": "address",
+                  "value": "{\"country\":\"India\",\"state\":\"Maharashtra\",\"city\":\"Mumbai\"}",
+                  "type": "text",
+                  "description": "If your server does not JSON.parse this, use the JSON-only request or align with your app."
+                },
+                {
+                  "key": "education",
+                  "value": "{\"highestQualification\":\"B.Tech\",\"collegeName\":\"Example\",\"fieldOfStudy\":\"CS\",\"graduationYear\":2020}",
+                  "type": "text"
+                },
+                {
+                  "key": "learningGoals",
+                  "value": "[\"Learn Node.js\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "skills",
+                  "value": "[\"JavaScript\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "profileImageUrl",
+                  "type": "file",
+                  "src": "",
+                  "description": "Field name must be `profileImageUrl` (multer `upload.single('profileImageUrl')`)."
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/user/profile/create-profile"
+          }
+        },
+        {
+          "name": "PUT Update profile (JSON, no image)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Updated Name\",\n  \"email\": \"user@example.com\",\n  \"gender\": \"female\",\n  \"dateOfBirth\": \"1996-01-20\",\n  \"bio\": \"Updated bio\",\n  \"address\": {\n    \"country\": \"India\",\n    \"state\": \"Karnataka\",\n    \"city\": \"Bengaluru\"\n  },\n  \"education\": {\n    \"highestQualification\": \"M.Tech\",\n    \"collegeName\": \"Another College\",\n    \"fieldOfStudy\": \"Software Engineering\",\n    \"graduationYear\": 2022\n  },\n  \"learningGoals\": [\"System design\"],\n  \"skills\": [\"TypeScript\", \"MongoDB\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/user/profile/update-profile",
+            "description": "Updates profile fields; can create a minimal profile if none exists. `fullName` is stored on `UserAuth` (`profileController.updateUserProfile`)."
+          }
+        },
+        {
+          "name": "PUT Update profile (multipart + new image)",
+          "request": {
+            "method": "PUT",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "fullName", "value": "Updated Name", "type": "text" },
+                { "key": "email", "value": "user@example.com", "type": "text" },
+                {
+                  "key": "profileImageUrl",
+                  "type": "file",
+                  "src": "",
+                  "description": "Replaces image on S3 if an existing `profileImageUrl` was set."
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/user/profile/update-profile"
+          }
+        },
+        {
+          "name": "GET Get profile (full)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/user/profile/get-profile",
+            "description": "Returns merged `UserAuth` + `UserProfile` shape (`getUserProfile`)."
+          }
+        },
+        {
+          "name": "GET User basic info (name + image)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/user/profile/getUser-basicInfo",
+            "description": "`getUserbasicInfo` — `fullName`, `profileImageUrl`."
+          }
+        },
+        {
+          "name": "GET Profile info (name + email + image)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/user/profile/getProfileInfo",
+            "description": "`getProfileInfo` — `name`, `email`, `profileImage`."
+          }
+        },
+        {
+          "name": "DELETE Delete profile (destructive)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/user/profile/delete-profile",
+            "description": "Deletes profile, related courses/lessons, notifications, ratings, favourites, FCM tokens, S3 image, and the **UserAuth** record (`deleteUserProfile`). Use only on test accounts."
+          }
+        },
+        {
+          "name": "POST Upload image (S3 utility)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Multer field name is `logo`."
+                },
+                {
+                  "key": "fileName",
+                  "value": "user/uploads/example.png",
+                  "type": "text",
+                  "description": "S3 key/path passed to `uploadImage` (`other_modules/uploloadImages.js`)."
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/user/profile/upload-image",
+            "description": "No `verifyUser` on this route — public upload helper. Requires both `logo` (file) and `fileName` (text)."
+          }
+        }
+      ]
+    }
+  ]
+}
