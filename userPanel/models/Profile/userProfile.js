@@ -6,46 +6,83 @@ const userProfileSchema = new mongoose.Schema({
         ref: "User",
         required: true,
     },
+
     profileImageUrl: {
         type: String,
+        default: "",
     },
+
     email: {
         type: String,
+        default: "",
         match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, 'Invalid email format']
     },
-          // 👤 PROFILE
-     gender: { type: String, enum: ["male", "female", "other"] },
-     dateOfBirth: Date,
-     bio: String,
-      
-        // 🎓 EDUCATION (VERY IMPORTANT FOR EDTECH)
-        education: {
-          highestQualification: String, // B.Tech, 12th, etc
-          collegeName: String,
-          fieldOfStudy: String,
-          graduationYear: Number
+
+    // 👤 PROFILE
+    gender: {
+        type: String,
+        enum: ["male", "female", "other"],
+        default: "other"
+    },
+
+    dateOfBirth: {
+        type: Date,
+        default: null
+    },
+
+    bio: {
+        type: String,
+        default: "",
+    },
+
+    // 🎓 EDUCATION
+    education: {
+        highestQualification: {
+            type: String,
+            default: ""
         },
-      
-        // 🎯 LEARNING GOALS
-        learningGoals: [
-          String // e.g. "Get a job", "Learn React", "Crack UPSC"
-        ],
-      
-        // 🧠 SKILLS
-        skills: [String], // 
-        // 
-        // e.g. ["JavaScript", "Node.js"]
-      
-        // 📍 LOCATION
-        address: {
-          country: String,
-          state: String,
-          city: String
+        collegeName: {
+            type: String,
+            default: ""
         },
-          
-      
-        // ❤️ WISHLIST       
-      
-});
+        fieldOfStudy: {
+            type: String,
+            default: ""
+        },
+        graduationYear: {
+            type: Number,
+            default: null
+        }
+    },
+
+    // 🎯 LEARNING GOALS
+    learningGoals: {
+        type: [String],
+        default: []
+    },
+
+    // 🧠 SKILLS
+    skills: {
+        type: [String],
+        default: []
+    },
+
+    // 📍 LOCATION
+    address: {
+        country: {
+            type: String,
+            default: ""
+        },
+        state: {
+            type: String,
+            default: ""
+        },
+        city: {
+            type: String,
+            default: ""
+        }
+    }
+
+}, { timestamps: true });
 
 module.exports = mongoose.model('UserProfile', userProfileSchema);
