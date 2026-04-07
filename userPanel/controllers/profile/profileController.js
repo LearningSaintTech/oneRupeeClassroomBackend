@@ -400,6 +400,7 @@ exports.updateUserProfile = async (req, res) => {
       learningGoals,
       skills
     } = req.body;
+    
     const skillsInput = skills !== undefined ? skills : req.body.Skills;
     const profileImageFile = req.file;
     console.log("Update request files:", req.file);
@@ -618,7 +619,7 @@ exports.getUserProfile = async (req, res) => {
             fullName: user.fullName,
             mobileNumber: user.mobileNumber,
             profileImageUrl: profile ? profile.profileImageUrl : null,
-            email: profile ? profile.email : null,
+            email:  user.email,
             gender: profile ? profile.gender : null,
             dateOfBirth: profile ? profile.dateOfBirth : null,
             bio: profile ? profile.bio : null,

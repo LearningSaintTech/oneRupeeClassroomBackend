@@ -9,14 +9,10 @@ const userProfileSchema = new mongoose.Schema({
 
     profileImageUrl: {
         type: String,
-        default: "",
+        required: true,
     },
 
-    email: {
-        type: String,
-        default: "",
-        match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, 'Invalid email format']
-    },
+ 
 
     // 👤 PROFILE
     gender: {
