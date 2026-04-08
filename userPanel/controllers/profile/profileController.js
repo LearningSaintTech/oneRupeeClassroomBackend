@@ -602,7 +602,7 @@ exports.getUserProfile = async (req, res) => {
             });
         }
         // Fetch UserAuth to get fullName and mobileNumber
-        const user = await UserAuth.findById(req.userId, 'fullName mobileNumber isEmailVerified');
+        const user = await UserAuth.findById(req.userId, 'fullName  email mobileNumber isEmailVerified');
         if (!user) {
             return apiResponse(res, {
                 success: false,
