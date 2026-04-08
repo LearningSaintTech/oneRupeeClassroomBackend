@@ -7,6 +7,7 @@ const RefreshToken = require('../../../userPanel/models/Auth/refreshToken');
 const { generateAccessToken, generateRefreshToken } = require('../../../utils/jwt');
 const { apiResponse } = require('../../../utils/apiResponse');
 const { buildAuthOtpTemplate } = require('../../utils/emailTemplates/authOtpTemplate');
+const UserProfile = require('../../../userPanel/models/Profile/userProfile');
 
 // Generate a 6-digit OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -254,7 +255,7 @@ exports.verifyOTP = async (req, res) => {
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    // ✅ Get latest OTP for this email
+    // ✅ Get latest OTP
     const otpRecord = await OTP.findOne({ email: trimmedEmail }).sort({ createdAt: -1 });
 
     if (!otpRecord) {
@@ -265,6 +266,7 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
+    // ✅ Expiry check
     if (new Date() > otpRecord.expiresAt) {
       return apiResponse(res, {
         success: false,
@@ -273,6 +275,7 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
+    // ✅ OTP match
     if (String(otpRecord.otp).trim() !== normalizedOtp) {
       return apiResponse(res, {
         success: false,
@@ -298,6 +301,24 @@ exports.verifyOTP = async (req, res) => {
       await user.save();
     }
 
+    // ✅ Create profile if not exists (UPSERT 🔥)
+    await UserProfile.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $setOnInsert: {
+          userId: user._id,
+          profileImageUrl: "",
+          gender: "other",
+          bio: "",
+          education: {},
+          learningGoals: [],
+          skills: [],
+          address: {}
+        }
+      },
+      { upsert: true, new: true }
+    );
+
     // ✅ Delete OTP after success
     await OTP.deleteOne({ _id: otpRecord._id });
 
@@ -309,13 +330,13 @@ exports.verifyOTP = async (req, res) => {
     const refreshHash = hashToken(refreshToken);
     const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // Upsert refresh session for this device
     await RefreshToken.findOneAndUpdate(
       { userId: user._id, deviceId },
       { token: refreshHash, expiresAt: refreshExpiry },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    // ✅ Final response
     return apiResponse(res, {
       success: true,
       message: 'Email verified successfully',

@@ -79,6 +79,6 @@ const userProfileSchema = new mongoose.Schema({
         }
     }
 
-}, { timestamps: true });
+}, { timestamps: true ,strict: true});
 
 module.exports = mongoose.model('UserProfile', userProfileSchema);

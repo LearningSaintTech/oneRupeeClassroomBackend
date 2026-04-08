@@ -58,6 +58,8 @@ function normalizeGraduationYear(edu) {
 }
 
 
+
+
 // // Create a new user profile (POST)
 // exports.createUserProfile = async (req, res) => {
 //     try {
@@ -386,12 +388,12 @@ exports.createUserProfile = async (req, res) => {
       });
   }
 };
+
 exports.updateUserProfile = async (req, res) => {
   try {
     const userId = req.userId;
     const {
       address,
-      email,
       fullName,
       gender,
       dateOfBirth,
@@ -460,18 +462,18 @@ exports.updateUserProfile = async (req, res) => {
         userProfile.address = addrRes.value;
       }
     }
-    if (email !== undefined) {
-      if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
-        console.log("Invalid email format:", email);
-        return apiResponse(res, {
-          success: false,
-          message: 'Invalid email format',
-          statusCode: 400,
-        });
-      }
-      console.log("Updating email:", email);
-      userProfile.email = email;
-    }
+    // if (email !== undefined) {
+    //   if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+    //     console.log("Invalid email format:", email);
+    //     return apiResponse(res, {
+    //       success: false,
+    //       message: 'Invalid email format',
+    //       statusCode: 400,
+    //     });
+    //   }
+    //   console.log("Updating email:", email);
+    //   userProfile.email = email;
+    // }
     if (gender !== undefined) {
       if (!["male", "female", "other"].includes(gender)) {
         console.log("Invalid gender:", gender);
