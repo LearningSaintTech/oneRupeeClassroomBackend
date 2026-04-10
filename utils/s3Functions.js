@@ -11,16 +11,37 @@ const { s3 } = require("../config/s3");
 
 const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5MB
 
-// Helper function to generate public file URL (CloudFront or S3)
+/**
+ * CloudFront distribution URL (preferred) or generic CDN base.
+ * Set CLOUDFRONT_URL=https://d1234567890.cloudfront.net (or CDN_BASE_URL for backward compatibility).
+ */
+const getCloudFrontBaseUrl = () => {
+  const explicit =
+    (process.env.CLOUDFRONT_URL && process.env.CLOUDFRONT_URL.trim()) ||
+    (process.env.CDN_BASE_URL && process.env.CDN_BASE_URL.trim()) ||
+    "";
+  return explicit;
+};
+
+/** Public URL for an object key: CloudFront when configured, else direct S3 HTTPS URL. */
 const getPublicFileUrl = (fileName) => {
-  const cdnBase = process.env.CDN_BASE_URL;
-  if (cdnBase && cdnBase.trim() !== "") {
-    // Use CloudFront / CDN domain
-    return `${cdnBase.replace(/\/+$/, "")}/${fileName}`;
+  const cloudFrontBase = getCloudFrontBaseUrl();
+  if (cloudFrontBase !== "") {
+    return `${cloudFrontBase.replace(/\/+$/, "")}/${fileName}`;
   }
-  // Fallback to direct S3 URL if CDN not configured
   return `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${fileName}`;
 };
+
+/** S3 key from a public URL served via CloudFront or S3 (path after host). */
+const extractKeyFromPublicUrl = (fileUrl) => {
+  const url = new URL(fileUrl);
+  return decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+};
+
+/** Used by migration scripts and tests — same URL rules as uploads. */
+exports.getCloudFrontBaseUrl = getCloudFrontBaseUrl;
+exports.getPublicFileUrl = getPublicFileUrl;
+exports.extractKeyFromPublicUrl = extractKeyFromPublicUrl;
 
 // Internal helper for multipart upload
 const multipartUpload = async (file, fileName) => {
@@ -123,9 +144,7 @@ exports.deleteImage = async (fileUrl) => {
     if (!fileUrl) {
       throw new Error('No file URL provided');
     }
-    const urlParts = new URL(fileUrl);
-    const key = urlParts.pathname.substring(1); // Extract key from URL
-    console.log("--------",process.env.AWS_S3_BUCKET_NAME)
+    const key = extractKeyFromPublicUrl(fileUrl);
     await s3.send(
       new DeleteObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME,
@@ -178,9 +197,7 @@ exports.uploadMultipleImages = async (files, fileNames) => {
 
 exports.deleteFromS3 = async (fileUrl) => {
   try {
-    const urlParts = new URL(fileUrl);
-    console.log("urlll",urlParts)
-    const key = urlParts.pathname.substring(1);
+    const key = extractKeyFromPublicUrl(fileUrl);
 
     const deleteCommand = new DeleteObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME,

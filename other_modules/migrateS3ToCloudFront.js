@@ -1,5 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const { getPublicFileUrl, getCloudFrontBaseUrl } = require("../utils/s3Functions");
 
 // Import all models that contain S3 URLs
 const Subcourse = require("../adminPanel/models/course/subcourse");
@@ -12,27 +13,29 @@ const InternshipLetter = require("../adminPanel/models/InternshipLetter/internsh
 const CertificateTemplate = require("../adminPanel/models/Templates/certificateTemplate");
 const RecordedLesson = require("../userPanel/models/recordedLesson/recordedLesson");
 
-// Configuration
+// Configuration (public URLs must match utils/s3Functions.js — use getPublicFileUrl)
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "yoraaecommerce";
-const CDN_BASE_URL = process.env.CDN_BASE_URL || "";
 
-// S3 URL pattern to match
+/** Match legacy global or regional virtual-hosted S3 URLs for this bucket. */
 const S3_URL_PATTERN = new RegExp(
-  `https://${S3_BUCKET_NAME}\\.s3\\.amazonaws\\.com/(.+)`,
+  `https://${S3_BUCKET_NAME}\\.s3(?:\\.[a-z0-9-]+)?\\.amazonaws\\.com/(.+)`,
   "i"
 );
 
+function extractS3KeyFromUrl(s3Url) {
+  if (!s3Url || typeof s3Url !== "string") return null;
+  const match = s3Url.match(S3_URL_PATTERN);
+  return match ? match[1] : null;
+}
+
 /**
- * Convert S3 URL to CloudFront URL
+ * Convert direct S3 URL to CloudFront (or CDN_BASE) URL using the same helper as runtime uploads.
  */
 function convertS3ToCloudFront(s3Url) {
   if (!s3Url || typeof s3Url !== "string") return s3Url;
-  
-  const match = s3Url.match(S3_URL_PATTERN);
-  if (!match) return s3Url; // Not an S3 URL, return as-is
-  
-  const fileKey = match[1];
-  return `${CDN_BASE_URL.replace(/\/+$/, "")}/${fileKey}`;
+  const fileKey = extractS3KeyFromUrl(s3Url);
+  if (!fileKey) return s3Url;
+  return getPublicFileUrl(fileKey);
 }
 
 /**
@@ -62,10 +65,11 @@ function updateUrlsInHtml(html) {
   if (!html || typeof html !== "string") return html;
   
   return html.replace(
-    new RegExp(`https://${S3_BUCKET_NAME}\\.s3\\.amazonaws\\.com/([^"'\\)\\s]+)`, "gi"),
-    (match, fileKey) => {
-      return `${CDN_BASE_URL.replace(/\/+$/, "")}/${fileKey}`;
-    }
+    new RegExp(
+      `https://${S3_BUCKET_NAME}\\.s3(?:\\.[a-z0-9-]+)?\\.amazonaws\\.com/([^"'\\)\\s]+)`,
+      "gi"
+    ),
+    (match, fileKey) => getPublicFileUrl(fileKey)
   );
 }
 
@@ -387,11 +391,13 @@ async function migrateRecordedLessons(dryRun = false) {
 async function migrateS3ToCloudFront(dryRun = true) {
   try {
     // Validate configuration
-    if (!CDN_BASE_URL || CDN_BASE_URL.trim() === "") {
+    if (!getCloudFrontBaseUrl()) {
       console.error(
-        "❌ Error: CDN_BASE_URL is not set in .env file!"
+        "❌ Error: Set CLOUDFRONT_URL or CDN_BASE_URL in .env (same as runtime uploads)."
       );
-      console.log("Please add: CDN_BASE_URL=https://d3bi5d5em13bi2.cloudfront.net");
+      console.log(
+        "Example: CLOUDFRONT_URL=https://dxxxxxxxxxxxx.cloudfront.net"
+      );
       process.exit(1);
     }
 
@@ -399,7 +405,7 @@ async function migrateS3ToCloudFront(dryRun = true) {
     console.log("🔄 S3 to CloudFront URL Migration");
     console.log("=".repeat(60));
     console.log(`S3 Bucket: ${S3_BUCKET_NAME}`);
-    console.log(`CloudFront URL: ${CDN_BASE_URL}`);
+    console.log(`CloudFront / CDN base: ${getCloudFrontBaseUrl()}`);
     console.log(`Mode: ${dryRun ? "DRY RUN (no changes)" : "LIVE (will update database)"}`);
     console.log("=".repeat(60));
 
