@@ -314,6 +314,8 @@ exports.buyCourse = async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency,
+      description: `Course purchase: ${subcourse.subcourseName || 'Subcourse'} (${subcourseId})`,
+      receipt_email: user.email || undefined,
       automatic_payment_methods: { enabled: true },
       metadata: {
         userId: String(userId),

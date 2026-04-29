@@ -238,6 +238,8 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: 'usd',
+      description: `Certificate purchase: ${subcourse.subcourseName || 'Subcourse'} (${subcourseId})`,
+      receipt_email: user.email || undefined,
       automatic_payment_methods: { enabled: true },
       metadata: {
         userId: String(userId),
@@ -388,6 +390,8 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: 'usd',
+      description: `Course certificate purchase: ${course.courseName || 'Course'} (${courseId})`,
+      receipt_email: user.email || undefined,
       automatic_payment_methods: { enabled: true },
       metadata: {
         userId: String(userId),
