@@ -12,6 +12,7 @@ const fs = require('fs');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 require("dotenv").config();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Import fetch (Node.js 18+ has built-in fetch, for older versions use node-fetch)
 const fetch = globalThis.fetch || require('node-fetch');
@@ -300,10 +301,18 @@ exports.buyCourse = async (req, res) => {
     }
 
     // Create Stripe PaymentIntent
-    const amount = subcourse.price; // Note: This seems hardcoded for testing; consider using subcourse.certificatePrice
+    const amount = Number(subcourse.price); // Stored in major unit (USD)
     const currency = 'usd';
+    const amountInCents = Math.round(amount * 100);
+    if (!Number.isFinite(amount) || amount <= 0 || amountInCents < 50) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Course price must be at least $0.50 for Stripe USD payments',
+        statusCode: 400,
+      });
+    }
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: amountInCents,
       currency,
       automatic_payment_methods: { enabled: true },
       metadata: {
@@ -426,12 +435,20 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Verify payment with Stripe
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    // Verify payment with Stripe (poll briefly for async post-3DS completion)
+    let intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const retryableStatuses = new Set(['requires_action', 'processing', 'requires_confirmation']);
+    let attempts = 0;
+    while (intent && intent.status !== 'succeeded' && retryableStatuses.has(intent.status) && attempts < 5) {
+      attempts += 1;
+      await sleep(1500);
+      intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    }
+
     if (!intent || intent.status !== 'succeeded') {
       return apiResponse(res, {
         success: false,
-        message: 'Payment is not completed',
+        message: `Payment is not completed (current status: ${intent?.status || 'unknown'})`,
         statusCode: 400,
       });
     }

@@ -226,8 +226,17 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
       });
     }
 
+    const amountInCents = Math.round(Number(subcourse.certificatePrice) * 100);
+    if (amountInCents < 50) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Certificate price must be at least $0.50 for Stripe USD payments',
+        statusCode: 400,
+      });
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(subcourse.certificatePrice * 100),
+      amount: amountInCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {
@@ -367,8 +376,17 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
       });
     }
 
+    const amountInCents = Math.round(Number(course.courseCertificatePrice) * 100);
+    if (amountInCents < 50) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Course certificate price must be at least $0.50 for Stripe USD payments',
+        statusCode: 400,
+      });
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(course.courseCertificatePrice * 100),
+      amount: amountInCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {

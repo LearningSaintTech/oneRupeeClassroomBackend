@@ -231,8 +231,9 @@ exports.buyRecordedLessons = async (req, res) => {
     }
 
     // Validate price > 0
-    const amount = subcourse.recordedlessonsPrice;
-    if (amount <= 0) {
+    const amount = Number(subcourse.recordedlessonsPrice);
+    const amountInCents = Math.round(amount * 100);
+    if (!Number.isFinite(amount) || amount <= 0) {
       console.log('buyRecordedLessons: Invalid price for recorded lessons:', { amount });
       return apiResponse(res, {
         success: false,
@@ -240,10 +241,17 @@ exports.buyRecordedLessons = async (req, res) => {
         statusCode: 400,
       });
     }
+    if (amountInCents < 50) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Recorded lessons price must be at least $0.50 for Stripe USD payments',
+        statusCode: 400,
+      });
+    }
 
     const currency = 'usd';
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: amountInCents,
       currency,
       automatic_payment_methods: { enabled: true },
       metadata: {

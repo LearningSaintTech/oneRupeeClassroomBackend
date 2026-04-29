@@ -408,8 +408,17 @@ exports.requestInternshipLetter = async (req, res) => {
       });
     }
 
+    const amountInCents = Math.round(Number(price) * 100);
+    if (amountInCents < 50) {
+      return apiResponse(res, {
+        success: false,
+        message: 'Internship letter price must be at least $0.50 for Stripe USD payments',
+        statusCode: 400,
+      });
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(price * 100),
+      amount: amountInCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {
