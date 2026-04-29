@@ -10,8 +10,7 @@ const CertificatePayment = require('../../models/certificates/certificate');
 const { apiResponse } = require('../../../utils/apiResponse');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment-timezone');
-const razorpayInstance = require('../../../config/razorpay');
-const crypto = require('crypto');
+const stripe = require('../../../config/stripe');
 const fs = require('fs');
 const axios = require('axios');
 require("dotenv").config();
@@ -227,33 +226,34 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Create Razorpay order
-    const receipt = `subcert_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
-    const orderOptions = {
-      amount: subcourse.certificatePrice * 100, // Convert to paise
-      currency: 'INR',
-      receipt: receipt,
-    };
-
-    const razorpayOrder = await razorpayInstance.orders.create(orderOptions);
-    if (!razorpayOrder || !razorpayOrder.id) {
-      console.log('[DEBUG] Failed to create Razorpay order');
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(subcourse.certificatePrice * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        subcourseId: String(subcourseId),
+        flow: 'subcourse-certificate',
+      },
+    });
+    if (!paymentIntent || !paymentIntent.id) {
+      console.log('[DEBUG] Failed to create Stripe payment intent');
       return apiResponse(res, {
         success: false,
-        message: 'Failed to create Razorpay order',
+        message: 'Failed to create payment intent',
         statusCode: 500,
       });
     }
 
     if (certificatePayment && certificatePayment.paymentStatus === false) {
-      // Update existing certificate payment with new Razorpay order
-      certificatePayment.razorpayOrderId = razorpayOrder.id;
+      // Update existing certificate payment with new Stripe payment intent
+      certificatePayment.stripePaymentIntentId = paymentIntent.id;
       certificatePayment.paymentAmount = subcourse.certificatePrice;
-      certificatePayment.paymentCurrency = 'INR';
+      certificatePayment.paymentCurrency = 'USD';
       certificatePayment.updatedAt = new Date();
 
       await certificatePayment.save();
-      console.log(`[DEBUG] Certificate payment updated - subcourseId: ${subcourseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      console.log(`[DEBUG] Certificate payment updated - subcourseId: ${subcourseId}, stripePaymentIntentId: ${paymentIntent.id}`);
     } else {
       // Create new certificate payment request
       certificatePayment = new CertificatePayment({
@@ -261,18 +261,18 @@ exports.requestSubcourseCertificatePayment = async (req, res) => {
         subcourseId,
         paymentStatus: false,
         paymentAmount: subcourse.certificatePrice,
-        paymentCurrency: 'INR',
-        razorpayOrderId: razorpayOrder.id,
+        paymentCurrency: 'USD',
+        stripePaymentIntentId: paymentIntent.id,
       });
 
       await certificatePayment.save();
-      console.log(`[DEBUG] Certificate payment request created - subcourseId: ${subcourseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      console.log(`[DEBUG] Certificate payment request created - subcourseId: ${subcourseId}, stripePaymentIntentId: ${paymentIntent.id}`);
     }
 
     return apiResponse(res, {
       success: true,
       message: certificatePayment.isNew ? 'Subcourse certificate payment request created successfully' : 'Subcourse certificate payment request updated successfully',
-      data: { certificatePayment, razorpayOrder },
+      data: { certificatePayment, paymentIntentId: paymentIntent.id, clientSecret: paymentIntent.client_secret },
       statusCode: 201,
     });
   } catch (error) {
@@ -367,33 +367,34 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
       });
     }
 
-    // Create Razorpay order
-    const receipt = `maincert_${userId.toString().slice(0, 12)}_${Date.now().toString().slice(-8)}`;
-    const orderOptions = {
-      amount: course.courseCertificatePrice * 100, // Convert to paise
-      currency: 'INR',
-      receipt: receipt,
-    };
-
-    const razorpayOrder = await razorpayInstance.orders.create(orderOptions);
-    if (!razorpayOrder || !razorpayOrder.id) {
-      console.log('[DEBUG] Failed to create Razorpay order');
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(course.courseCertificatePrice * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        courseId: String(courseId),
+        flow: 'main-course-certificate',
+      },
+    });
+    if (!paymentIntent || !paymentIntent.id) {
+      console.log('[DEBUG] Failed to create Stripe payment intent');
       return apiResponse(res, {
         success: false,
-        message: 'Failed to create Razorpay order',
+        message: 'Failed to create payment intent',
         statusCode: 500,
       });
     }
 
     if (certificatePayment && certificatePayment.paymentStatus === false) {
-      // Update existing certificate payment with new Razorpay order
-      certificatePayment.razorpayOrderId = razorpayOrder.id;
+      // Update existing certificate payment with new Stripe payment intent
+      certificatePayment.stripePaymentIntentId = paymentIntent.id;
       certificatePayment.paymentAmount = course.courseCertificatePrice;
-      certificatePayment.paymentCurrency = 'INR';
+      certificatePayment.paymentCurrency = 'USD';
       certificatePayment.updatedAt = new Date();
 
       await certificatePayment.save();
-      console.log(`[DEBUG] Certificate payment updated - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      console.log(`[DEBUG] Certificate payment updated - courseId: ${courseId}, stripePaymentIntentId: ${paymentIntent.id}`);
     } else {
       // Create new certificate payment request
       certificatePayment = new CertificatePayment({
@@ -401,18 +402,18 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
         courseId,
         paymentStatus: false,
         paymentAmount: course.courseCertificatePrice,
-        paymentCurrency: 'INR',
-        razorpayOrderId: razorpayOrder.id,
+        paymentCurrency: 'USD',
+        stripePaymentIntentId: paymentIntent.id,
       });
 
       await certificatePayment.save();
-      console.log(`[DEBUG] Certificate payment request created - courseId: ${courseId}, razorpayOrderId: ${razorpayOrder.id}`);
+      console.log(`[DEBUG] Certificate payment request created - courseId: ${courseId}, stripePaymentIntentId: ${paymentIntent.id}`);
     }
 
     return apiResponse(res, {
       success: true,
       message: certificatePayment.isNew ? 'Main course certificate payment request created successfully' : 'Main course certificate payment request updated successfully',
-      data: { certificatePayment, razorpayOrder },
+      data: { certificatePayment, paymentIntentId: paymentIntent.id, clientSecret: paymentIntent.client_secret },
       statusCode: 201,
     });
   } catch (error) {
@@ -428,7 +429,7 @@ exports.requestMainCourseCertificatePayment = async (req, res) => {
 // Verify Certificate Payment
 exports.verifyCertificatePayment = async (req, res) => {
   try {
-    const { certificatePaymentId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { certificatePaymentId, paymentIntentId } = req.body;
     const userId = req.userId;
 
     console.log(`[DEBUG] Verifying payment - certificatePaymentId: ${certificatePaymentId}, userId: ${userId}`);
@@ -454,27 +455,22 @@ exports.verifyCertificatePayment = async (req, res) => {
       });
     }
 
-    // Verify payment signature
-    const sign = `${razorpayOrderId}|${razorpayPaymentId}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', razorpayInstance.key_secret)
-      .update(sign)
-      .digest('hex');
-
-    if (expectedSignature !== razorpaySignature) {
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!intent || intent.status !== 'succeeded') {
       console.log('[DEBUG] Payment signature verification failed');
       return apiResponse(res, {
         success: false,
-        message: 'Payment signature verification failed',
+        message: 'Payment is not completed',
         statusCode: 400,
       });
     }
 
     // Update payment details
     certificatePayment.paymentStatus = true;
-    certificatePayment.razorpayOrderId = razorpayOrderId;
-    certificatePayment.razorpayPaymentId = razorpayPaymentId;
-    certificatePayment.razorpaySignature = razorpaySignature;
+    certificatePayment.stripePaymentIntentId = paymentIntentId;
+    certificatePayment.stripeChargeId = intent.latest_charge ? String(intent.latest_charge) : undefined;
+    certificatePayment.stripePaymentMethodId = intent.payment_method ? String(intent.payment_method) : undefined;
+    certificatePayment.paymentCurrency = (intent.currency || 'usd').toUpperCase();
     certificatePayment.paymentDate = new Date();
 
     await certificatePayment.save();
@@ -661,7 +657,7 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
           if (!existingPayment.paymentStatus) {
             existingPayment.paymentStatus = true;
             existingPayment.paymentAmount = subcourse.certificatePrice || 0;
-            existingPayment.paymentCurrency = 'INR';
+            existingPayment.paymentCurrency = 'USD';
             existingPayment.paymentDate = new Date();
             await existingPayment.save();
           }
@@ -722,7 +718,7 @@ exports.verifyAppleSubcourseCertificate = async (req, res) => {
     // Create or update certificatePayment with Apple IAP details
     console.log('verifyAppleSubcourseCertificate: Updating/creating certificatePayment:', { userId, subcourseId });
     const paymentAmount = subcourse.certificatePrice || 0;
-    const paymentCurrency = 'INR'; // Apple IAP typically in USD
+    const paymentCurrency = 'USD';
 
     if (!certificatePayment) {
       console.log('verifyAppleSubcourseCertificate: Creating new certificatePayment for:', { userId, subcourseId });
@@ -954,7 +950,7 @@ exports.verifyAppleMainCourseCertificate = async (req, res) => {
     // Create or update certificatePayment with Apple IAP details
     console.log('verifyAppleMainCourseCertificate: Updating/creating certificatePayment:', { userId, courseId });
     const paymentAmount = course.courseCertificatePrice || 0;
-    const paymentCurrency = 'INR'; // Apple IAP typically in USD
+    const paymentCurrency = 'USD';
 
     if (!certificatePayment) {
       console.log('verifyAppleMainCourseCertificate: Creating new certificatePayment for:', { userId, courseId });

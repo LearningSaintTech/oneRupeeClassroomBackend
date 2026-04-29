@@ -41,6 +41,7 @@ const recordedLessonRoutes = require("./userPanel/routes/recordedLessonRoutes");
 const activityRoutes = require("./adminPanel/routes/activityRoutes");
 const userActivityRoutes = require("./userPanel/routes/activityRoutes")
 const chatBotRoutes = require("./AI-Chatbot/routes/chatRoutes")
+const { handleStripeWebhook } = require('./userPanel/controllers/payments/stripeWebhookController');
 
 
 require('dotenv').config();
@@ -55,6 +56,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

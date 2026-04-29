@@ -1,21 +1,22 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
 // Require all models with updated paths
-const Admin = require('./adminPanel/models/Auth/auth');
-const AdminProfile = require('./adminPanel/models/profile/profile');
-const Template = require('./adminPanel/models/Templates/certificateTemplate');
-const Course = require('./adminPanel/models/course/course');
-const Lesson = require('./adminPanel/models/course/lesson');
-const Subcourse = require('./adminPanel/models/course/subcourse');
-const InternshipLetter = require('./adminPanel/models/InternshipLetter/internshipLetter');
-const Promo = require('./Promo/models/promo');
-const User = require('./userPanel/models/Auth/Auth');
-const Favourite = require('./userPanel/models/Favourite/favouriteCourse');
-const UserProfile = require('./userPanel/models/Profile/userProfile');
-const Rating = require('./userPanel/models/Rating/rating');
-const UserCourse = require('./userPanel/models/UserCourse/userCourse');
-const UserLesson = require('./userPanel/models/UserCourse/userLesson');
-const UserMainCourse = require('./userPanel/models/UserCourse/usermainCourse');
+const Admin = require('../adminPanel/models/Auth/auth');
+const AdminProfile = require('../adminPanel/models/profile/profile');
+const Template = require('../adminPanel/models/Templates/certificateTemplate');
+const Course = require('../adminPanel/models/course/course');
+const Lesson = require('../adminPanel/models/course/lesson');
+const Subcourse = require('../adminPanel/models/course/subcourse');
+const InternshipLetter = require('../adminPanel/models/InternshipLetter/internshipLetter');
+const Promo = require('../Promo/models/promo');
+const User = require('../userPanel/models/Auth/Auth');
+const Favourite = require('../userPanel/models/Favourite/favouriteCourse');
+const UserProfile = require('../userPanel/models/Profile/userProfile');
+const Rating = require('../userPanel/models/Rating/rating');
+const UserCourse = require('../userPanel/models/UserCourse/userCourse');
+const UserLesson = require('../userPanel/models/UserCourse/userLesson');
+const UserMainCourse = require('../userPanel/models/UserCourse/usermainCourse');
 
 // Image and video URLs provided
 const imageUrl = 'https://yoraaecommerce.s3.amazonaws.com/promos/1756098426906_empty-classroom-desk-with-book-colored-pencils.jpg';
@@ -232,10 +233,13 @@ const certificateTemplate = `
 `;
 
 // Connect to MongoDB
-// const DB_URI = 
+const DB_URI = process.env.MONGO_URI;
 
 async function seedDatabase() {
   try {
+    if (!DB_URI) {
+      throw new Error('MONGO_URI is not set in environment');
+    }
     console.log('Attempting to connect to MongoDB...');
     await mongoose.connect(DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
     console.log('Connected to MongoDB successfully');
@@ -265,7 +269,7 @@ async function seedDatabase() {
     console.log('Creating admins...');
     const admins = await Admin.insertMany([
       {
-        mobileNumber: '+917042456533',
+        mobileNumber: '+911234567890',
         isNumberVerified: true,
         role: 'admin',
       },
@@ -314,7 +318,8 @@ async function seedDatabase() {
     const users = await User.insertMany([
       {
         fullName: 'User One',
-        mobileNumber: '+911234567890',
+        mobileNumber: '9123456789',
+        email: 'user1@example.com',
         isNumberVerified: true,
         role: 'user',
         isEmailVerified: true,
@@ -322,7 +327,8 @@ async function seedDatabase() {
       },
       {
         fullName: 'User Two',
-        mobileNumber: '+919876543210',
+        mobileNumber: '9876543210',
+        email: 'user2@example.com',
         isNumberVerified: true,
         role: 'user',
         isEmailVerified: false,
@@ -330,7 +336,8 @@ async function seedDatabase() {
       },
       {
         fullName: 'User Three',
-        mobileNumber: '+918765432109',
+        mobileNumber: '8765432109',
+        email: 'user3@example.com',
         isNumberVerified: false,
         role: 'user',
         isEmailVerified: false,
@@ -338,7 +345,8 @@ async function seedDatabase() {
       },
       {
         fullName: 'User Four',
-        mobileNumber: '+917654321098',
+        mobileNumber: '7654321098',
+        email: 'user4@example.com',
         isNumberVerified: true,
         role: 'user',
         isEmailVerified: true,
@@ -346,7 +354,8 @@ async function seedDatabase() {
       },
       {
         fullName: 'User Five',
-        mobileNumber: '+916543210987',
+        mobileNumber: '6543210987',
+        email: 'user5@example.com',
         isNumberVerified: true,
         role: 'user',
         isEmailVerified: false,
@@ -354,7 +363,8 @@ async function seedDatabase() {
       },
       {
         fullName: 'User Six',
-        mobileNumber: '+915432109876',
+        mobileNumber: '9432109876',
+        email: 'user6@example.com',
         isNumberVerified: false,
         role: 'user',
         isEmailVerified: false,
@@ -1547,66 +1557,66 @@ async function seedDatabase() {
     await InternshipLetter.insertMany([
       {
         userId: users[0]._id,
-        courseId: courses[0]._id,
+        subcourseId: subcourses[0]._id,
         internshipLetter: 'https://s3.amazonaws.com/internship-letter-user1.pdf',
         paymentStatus: true,
         uploadStatus: 'uploaded',
-        razorpayOrderId: 'order_int1',
-        razorpayPaymentId: 'pay_int1',
-        razorpaySignature: 'sig_int1',
+        stripePaymentIntentId: 'pi_int1',
+        stripeChargeId: 'ch_int1',
+        stripePaymentMethodId: 'pm_int1',
         paymentAmount: 500,
         paymentCurrency: 'INR',
         paymentDate: new Date(),
       },
       {
         userId: users[0]._id,
-        courseId: courses[1]._id,
+        subcourseId: subcourses[2]._id,
         internshipLetter: 'https://s3.amazonaws.com/internship-letter-user1b.pdf',
         paymentStatus: true,
         uploadStatus: 'uploaded',
-        razorpayOrderId: 'order_int2',
-        razorpayPaymentId: 'pay_int2',
-        razorpaySignature: 'sig_int2',
+        stripePaymentIntentId: 'pi_int2',
+        stripeChargeId: 'ch_int2',
+        stripePaymentMethodId: 'pm_int2',
         paymentAmount: 1000,
         paymentCurrency: 'INR',
         paymentDate: new Date(),
       },
       {
         userId: users[1]._id,
-        courseId: courses[0]._id,
+        subcourseId: subcourses[1]._id,
         internshipLetter: '',
         paymentStatus: false,
         uploadStatus: 'upload',
       },
       {
         userId: users[2]._id,
-        courseId: courses[3]._id,
+        subcourseId: subcourses[6]._id,
         internshipLetter: 'https://s3.amazonaws.com/internship-letter-user3.pdf',
         paymentStatus: true,
         uploadStatus: 'uploaded',
-        razorpayOrderId: 'order_int3',
-        razorpayPaymentId: 'pay_int3',
-        razorpaySignature: 'sig_int3',
+        stripePaymentIntentId: 'pi_int3',
+        stripeChargeId: 'ch_int3',
+        stripePaymentMethodId: 'pm_int3',
         paymentAmount: 1200,
         paymentCurrency: 'INR',
         paymentDate: new Date(),
       },
       {
         userId: users[3]._id,
-        courseId: courses[0]._id,
+        subcourseId: subcourses[0]._id,
         internshipLetter: 'https://s3.amazonaws.com/internship-letter-user4.pdf',
         paymentStatus: true,
         uploadStatus: 'uploaded',
-        razorpayOrderId: 'order_int4',
-        razorpayPaymentId: 'pay_int4',
-        razorpaySignature: 'sig_int4',
+        stripePaymentIntentId: 'pi_int4',
+        stripeChargeId: 'ch_int4',
+        stripePaymentMethodId: 'pm_int4',
         paymentAmount: 500,
         paymentCurrency: 'INR',
         paymentDate: new Date(),
       },
       {
         userId: users[4]._id,
-        courseId: courses[1]._id,
+        subcourseId: subcourses[3]._id,
         internshipLetter: '',
         paymentStatus: false,
         uploadStatus: 'upload',

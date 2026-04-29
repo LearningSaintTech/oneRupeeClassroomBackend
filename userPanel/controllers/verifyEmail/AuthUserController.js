@@ -31,9 +31,19 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 });
 
 const sendOtpEmail = async (email, otp, purpose) => {
+  console.log('[OTP][MAIL] Preparing email send', {
+    to: email,
+    purpose,
+    hasEmailUser: Boolean(process.env.EMAIL_USER),
+    hasEmailPass: Boolean(process.env.EMAIL_PASS),
+  });
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -42,7 +52,19 @@ const sendOtpEmail = async (email, otp, purpose) => {
     html: buildAuthOtpTemplate({ otp, purpose }),
   };
 
-  await transporter.sendMail(mailOptions);
+  const sendMailPromise = transporter.sendMail(mailOptions);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('SMTP timeout while sending OTP email')), 15000)
+  );
+
+  const result = await Promise.race([sendMailPromise, timeoutPromise]);
+  console.log('[OTP][MAIL] Email send success', {
+    to: email,
+    purpose,
+    messageId: result?.messageId || null,
+    accepted: result?.accepted || [],
+    rejected: result?.rejected || [],
+  });
 };
 
 // Hash refresh token before storing in DB
@@ -186,6 +208,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log('[OTP][LOGIN] Request received', { email });
 
     if (!isValidEmail(email)) {
       return apiResponse(res, {
@@ -196,8 +219,14 @@ exports.login = async (req, res) => {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
+    console.log('[OTP][LOGIN] Normalized email', { trimmedEmail });
 
     const user = await User.findOne({ email: trimmedEmail });
+    console.log('[OTP][LOGIN] User lookup result', {
+      found: Boolean(user),
+      isEmailVerified: Boolean(user?.isEmailVerified),
+      userId: user?._id || null,
+    });
 
     if (!user || !user.isEmailVerified) {
       return apiResponse(res, {
@@ -209,16 +238,25 @@ exports.login = async (req, res) => {
 
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    console.log('[OTP][LOGIN] OTP generated', {
+      email: trimmedEmail,
+      otp,
+      expiresAt,
+    });
 
     await OTP.deleteMany({ email: trimmedEmail });
+    console.log('[OTP][LOGIN] Cleared previous OTP records', { email: trimmedEmail });
 
     await OTP.create({
       email: trimmedEmail,
       otp,
       expiresAt,
     });
+    console.log('[OTP][LOGIN] OTP saved to DB', { email: trimmedEmail });
 
+    console.log('[OTP][LOGIN] Sending OTP email...');
     await sendOtpEmail(trimmedEmail, otp, 'email login');
+    console.log('[OTP][LOGIN] OTP email send completed');
 
     return apiResponse(res, {
       success: true,
@@ -227,6 +265,10 @@ exports.login = async (req, res) => {
       statusCode: 200,
     });
   } catch (error) {
+    console.error('[OTP][LOGIN] Failed', {
+      message: error.message,
+      stack: error.stack,
+    });
     return apiResponse(res, {
       success: false,
       message: 'Error sending login OTP',
@@ -453,6 +495,7 @@ exports.refreshTokenHandler = async (req, res) => {
 exports.resendOTP = async (req, res) => {
   try {
     const { email,  } = req.body;
+    console.log('[OTP][RESEND] Request received', { email });
 
    
 
@@ -467,8 +510,13 @@ exports.resendOTP = async (req, res) => {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
+    console.log('[OTP][RESEND] Normalized email', { trimmedEmail });
 
     const user = await User.findOne({ email: trimmedEmail });
+    console.log('[OTP][RESEND] User lookup result', {
+      found: Boolean(user),
+      userId: user?._id || null,
+    });
 
     if (!user) {
       return apiResponse(res, {
@@ -482,16 +530,25 @@ exports.resendOTP = async (req, res) => {
 
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    console.log('[OTP][RESEND] OTP generated', {
+      email: trimmedEmail,
+      otp,
+      expiresAt,
+    });
 
     await OTP.deleteMany({ email: trimmedEmail });
+    console.log('[OTP][RESEND] Cleared previous OTP records', { email: trimmedEmail });
 
     await OTP.create({
       email: trimmedEmail,
       otp,
       expiresAt,
     });
+    console.log('[OTP][RESEND] OTP saved to DB', { email: trimmedEmail });
 
+    console.log('[OTP][RESEND] Sending OTP email...');
     await sendOtpEmail(trimmedEmail, otp, 'resend email OTP');
+    console.log('[OTP][RESEND] OTP email send completed');
 
     return apiResponse(res, {
       success: true,
@@ -500,6 +557,10 @@ exports.resendOTP = async (req, res) => {
       statusCode: 200,
     });
   } catch (error) {
+    console.error('[OTP][RESEND] Failed', {
+      message: error.message,
+      stack: error.stack,
+    });
     return apiResponse(res, {
       success: false,
       message: 'Error resending OTP',

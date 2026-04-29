@@ -24,15 +24,15 @@ const internshipLetterSchema = new mongoose.Schema({
         enum: ["upload", "uploaded"],
         default: "upload"
     },
-    razorpayOrderId: {
+    stripePaymentIntentId: {
         type: String,
         required: false,
     },
-    razorpayPaymentId: {
+    stripeChargeId: {
         type: String,
         required: false,
     },
-    razorpaySignature: {
+    stripePaymentMethodId: {
         type: String,
         required: false,
     },
@@ -42,7 +42,7 @@ const internshipLetterSchema = new mongoose.Schema({
     },
     paymentCurrency: {
         type: String,
-        default: 'INR',
+        default: 'USD',
         required: false,
     },
     paymentDate: {

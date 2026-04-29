@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
-const crypto = require('crypto');
 const InternshipLetter = require('../../../adminPanel/models/InternshipLetter/internshipLetter');
 const Course = require('../../../adminPanel/models/course/course');
 const Subcourse = require("../../../adminPanel/models/course/subcourse");
-const razorpayInstance = require('../../../config/razorpay');
+const stripe = require('../../../config/stripe');
 const UserAuth = require("../../models/Auth/Auth")
 const { apiResponse } = require('../../../utils/apiResponse');
 const UsermainCourse = require('../../models/UserCourse/usermainCourse');
@@ -331,7 +330,7 @@ exports.requestInternshipLetter = async (req, res) => {
         paymentStatus: true,
         paymentAmount: 0,
         uploadStatus: 'upload',
-        paymentCurrency: 'INR',
+        paymentCurrency: 'USD',
       });
 
       await internshipLetter.save();
@@ -409,25 +408,26 @@ exports.requestInternshipLetter = async (req, res) => {
       });
     }
 
-    // Create Razorpay order
-    const receipt = `int_${userId.toString().slice(-8)}_${Date.now()}`;
-    log('Creating Razorpay order', { amount: price * 100, receipt });
-
-    const razorpayOrder = await razorpayInstance.orders.create({
-      amount: price * 100,
-      currency: 'INR',
-      receipt,
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(price * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        subcourseId: String(subcourseId),
+        flow: 'internship-letter',
+      },
     });
 
-    if (!razorpayOrder?.id) {
-      log('Razorpay order creation failed', { razorpayResponse: razorpayOrder });
+    if (!paymentIntent?.id) {
+      log('Stripe payment intent creation failed', { stripeResponse: paymentIntent });
       return apiResponse(res, {
         success: false,
         message: 'Failed to create payment order',
         statusCode: 500,
       });
     }
-    log('Razorpay order created', { orderId: razorpayOrder.id, amount: razorpayOrder.amount });
+    log('Stripe payment intent created', { paymentIntentId: paymentIntent.id, amount: paymentIntent.amount });
 
     // Reuse pending request or create new
     let internshipLetter = await InternshipLetter.findOne({
@@ -438,7 +438,7 @@ exports.requestInternshipLetter = async (req, res) => {
 
     if (internshipLetter) {
       log('Reusing existing pending internship letter', { internshipLetterId: internshipLetter._id });
-      internshipLetter.razorpayOrderId = razorpayOrder.id;
+      internshipLetter.stripePaymentIntentId = paymentIntent.id;
       internshipLetter.paymentAmount = price;
     } else {
       log('Creating new pending internship letter record');
@@ -447,26 +447,24 @@ exports.requestInternshipLetter = async (req, res) => {
         subcourseId,
         paymentStatus: false,
         paymentAmount: price,
-        paymentCurrency: 'INR',
-        razorpayOrderId: razorpayOrder.id,
+        paymentCurrency: 'USD',
+        stripePaymentIntentId: paymentIntent.id,
         uploadStatus: 'upload',
       });
     }
 
     await internshipLetter.save();
-    log('Internship letter record saved', { internshipLetterId: internshipLetter._id, razorpayOrderId: razorpayOrder.id });
+    log('Internship letter record saved', { internshipLetterId: internshipLetter._id, stripePaymentIntentId: paymentIntent.id });
 
     return apiResponse(res, {
       success: true,
       message: 'Payment order created successfully',
       data: {
         internshipLetter,
-        razorpayOrder: {
-          id: razorpayOrder.id,
-          amount: razorpayOrder.amount,
-          currency: razorpayOrder.currency,
-          receipt: razorpayOrder.receipt,
-        },
+        paymentIntentId: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency.toUpperCase(),
       },
       statusCode: 201,
     });
@@ -489,18 +487,18 @@ exports.updatePaymentStatus = async (req, res) => {
     console.log(`[DEBUG] [${new Date().toISOString()}] updatePaymentStatus | ${msg}`, {
       userId: req.userId,
       internshipLetterId: req.body.internshipLetterId,
-      razorpayOrderId: req.body.razorpayOrderId,
+      paymentIntentId: req.body.paymentIntentId,
       duration: `${Date.now() - startTime}ms`,
       ...extra,
     });
   };
 
   try {
-    const { internshipLetterId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { internshipLetterId, paymentIntentId } = req.body;
     const userId = req.userId;
     const io = req.app.get('io');
 
-    log('Payment verification webhook received', { internshipLetterId, razorpayOrderId, razorpayPaymentId: !!razorpayPaymentId });
+    log('Payment verification webhook received', { internshipLetterId, paymentIntentId });
 
     if (!mongoose.Types.ObjectId.isValid(internshipLetterId)) {
       log('Invalid internshipLetterId format');
@@ -534,39 +532,28 @@ exports.updatePaymentStatus = async (req, res) => {
     }
 
     // Validate payload
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-      log('Missing Razorpay payload fields');
+    if (!paymentIntentId) {
+      log('Missing Stripe payload fields');
       return apiResponse(res, { success: false, message: 'Missing payment details', statusCode: 400 });
     }
 
-    // Verify signature
-    const expectedSignature = crypto
-      .createHmac('sha256', razorpayInstance.key_secret)
-      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-      .digest('hex');
-
-    log('Signature verification', { expectedSignature, receivedSignature: razorpaySignature, match: expectedSignature === razorpaySignature });
-
-    if (expectedSignature !== razorpaySignature) {
-      log('Invalid payment signature - possible tampering!');
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!intent || intent.status !== 'succeeded') {
+      log('Stripe payment not succeeded', { paymentIntentId, status: intent?.status });
       return apiResponse(res, { success: false, message: 'Invalid payment signature', statusCode: 400 });
-    }
-
-    // Match order ID
-    if (internshipLetter.razorpayOrderId !== razorpayOrderId) {
-      log('Order ID mismatch', { dbOrderId: internshipLetter.razorpayOrderId, payloadOrderId: razorpayOrderId });
-      return apiResponse(res, { success: false, message: 'Order ID mismatch', statusCode: 400 });
     }
 
     // Mark as paid
     internshipLetter.paymentStatus = true;
     internshipLetter.uploadStatus = 'upload';
-    internshipLetter.razorpayPaymentId = razorpayPaymentId;
-    internshipLetter.razorpaySignature = razorpaySignature;
+    internshipLetter.stripePaymentIntentId = paymentIntentId;
+    internshipLetter.stripeChargeId = intent.latest_charge ? String(intent.latest_charge) : undefined;
+    internshipLetter.stripePaymentMethodId = intent.payment_method ? String(intent.payment_method) : undefined;
+    internshipLetter.paymentCurrency = (intent.currency || 'usd').toUpperCase();
     internshipLetter.paymentDate = new Date();
     await internshipLetter.save();
 
-    log('Payment marked as SUCCESSFUL', { internshipLetterId: internshipLetter._id, razorpayPaymentId });
+    log('Payment marked as SUCCESSFUL', { internshipLetterId: internshipLetter._id, stripeChargeId: internshipLetter.stripeChargeId });
 
     // Notify admin
     const subcourseDetail = await Subcourse.findById(internshipLetter.subcourseId).select('subcourseName');
@@ -757,7 +744,7 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
           paymentStatus: true,
           paymentAmount: 0,
           uploadStatus: 'upload',
-          paymentCurrency: 'INR',
+          paymentCurrency: 'USD',
         });
         await internshipLetter.save();
         console.log('verifyAppleInternshipLetter: Free internship letter created', { internshipLetterId: internshipLetter._id });
@@ -766,7 +753,7 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
         internshipLetter.paymentStatus = true;
         internshipLetter.paymentAmount = 0;
         internshipLetter.uploadStatus = 'upload';
-        internshipLetter.paymentCurrency = 'INR';
+        internshipLetter.paymentCurrency = 'USD';
         await internshipLetter.save();
         console.log('verifyAppleInternshipLetter: Free internship letter updated', { internshipLetterId: internshipLetter._id });
       }
@@ -955,7 +942,7 @@ exports.verifyAppleInternshipLetter = async (req, res) => {
 
     // Create or update InternshipLetter
     const paymentAmount = subcourse.internshipLetterPrice || 0; // assuming you have this field
-    const paymentCurrency = 'INR'; // or 'USD' depending on your Apple setup
+    const paymentCurrency = 'USD';
 
     if (!internshipLetter) {
       internshipLetter = new InternshipLetter({

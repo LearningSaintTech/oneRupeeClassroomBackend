@@ -1,7 +1,7 @@
 const io = require('socket.io-client');
 
 // Backend WebSocket server URL
-const SOCKET_URL = 'https://main.learningsaint.com'; // Update to your backend URL
+const SOCKET_URL = 'http://172.24.112.1:3000'; // Update to your backend URL
 const TEST_USER_ID = '68ac5f395c350e54e984aebe'; // Test user ID; replace with a valid userId from your database
 
 // Initialize Socket.IO client

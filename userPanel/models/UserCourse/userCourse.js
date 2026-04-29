@@ -28,15 +28,15 @@ const userCourseSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    razorpayOrderId: {
+    stripePaymentIntentId: {
         type: String,
         required: false,
     },
-    razorpayPaymentId: {
+    stripeChargeId: {
         type: String,
         required: false,
     },
-    razorpaySignature: {
+    stripePaymentMethodId: {
         type: String,
         required: false,
     },
@@ -46,7 +46,7 @@ const userCourseSchema = new mongoose.Schema({
     },
     paymentCurrency: {
         type: String,
-        default: 'INR',
+        default: 'USD',
         required: false,
     },
     paymentDate: {

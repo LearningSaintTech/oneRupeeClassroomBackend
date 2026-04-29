@@ -4,9 +4,8 @@ const UserCourse = require('../../models/UserCourse/userCourse');
 const Subcourse = require("../../../adminPanel/models/course/subcourse");
 const UsermainCourse = require("../../models/UserCourse/usermainCourse");
 const { apiResponse } = require('../../../utils/apiResponse');
-const razorpayInstance = require('../../../config/razorpay');
+const stripe = require('../../../config/stripe');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
-const crypto = require("crypto");
 const { emitBuyCourse } = require('../../../socket/emitters');
 const jose = require('node-jose');
 const fs = require('fs');
@@ -300,28 +299,24 @@ exports.buyCourse = async (req, res) => {
       });
     }
 
-    // Create Razorpay order with shortened receipt
+    // Create Stripe PaymentIntent
     const amount = subcourse.price; // Note: This seems hardcoded for testing; consider using subcourse.certificatePrice
-    const currency = 'INR';
-    const receipt = `rcpt_${userId.slice(-8)}_${subcourseId.slice(-8)}_${Date.now().toString().slice(-6)}`;
-    console.log('buyCourse: Generating Razorpay order with:', { amount, currency, receipt });
-
-    if (receipt.length > 40) {
-      console.log('buyCourse: Receipt length exceeds Razorpay limit:', { receipt, length: receipt.length });
-      return apiResponse(res, {
-        success: false,
-        message: 'Receipt length exceeds Razorpay limit',
-        statusCode: 400,
-      });
-    }
-
-    const order = await razorpayInstance.orders.create({
-      amount: Math.round(amount * 100), // Convert to paise
+    const currency = 'usd';
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
       currency,
-      receipt,
-      payment_capture: 1, // Auto-capture payment
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        subcourseId: String(subcourseId),
+        flow: 'buy-course',
+      },
     });
-    console.log('buyCourse: Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+    console.log('buyCourse: Stripe payment intent created:', {
+      paymentIntentId: paymentIntent.id,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+    });
 
     // Check if usermainCourse exists for the user and main course
     console.log('buyCourse: Checking for existing usermainCourse:', { userId, courseId: subcourse.courseId });
@@ -359,20 +354,20 @@ exports.buyCourse = async (req, res) => {
         paymentStatus: false,
         isCompleted: false,
         progress: '0%',
-        razorpayOrderId: order.id,
+        stripePaymentIntentId: paymentIntent.id,
         paymentAmount: amount,
-        paymentCurrency: currency,
+        paymentCurrency: currency.toUpperCase(),
       });
     } else {
       console.log('buyCourse: Updating existing userCourse:', { userCourseId: userCourse._id });
       userCourse.paymentStatus = false;
-      userCourse.razorpayOrderId = order.id;
+      userCourse.stripePaymentIntentId = paymentIntent.id;
       userCourse.paymentAmount = amount;
-      userCourse.paymentCurrency = currency;
+      userCourse.paymentCurrency = currency.toUpperCase();
     }
 
     await userCourse.save();
-    console.log('buyCourse: userCourse saved:', { userCourseId: userCourse._id, razorpayOrderId: order.id });
+    console.log('buyCourse: userCourse saved:', { userCourseId: userCourse._id, stripePaymentIntentId: paymentIntent.id });
 
     // Return order details for frontend payment
     console.log('buyCourse: Order creation successful, returning response');
@@ -380,10 +375,10 @@ exports.buyCourse = async (req, res) => {
       success: true,
       message: 'Order created successfully, proceed with payment',
       data: {
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        // key: razorpayInstance.key_id,
+        paymentIntentId: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency.toUpperCase(),
         userCourse,
         usermainCourse,
       },
@@ -403,21 +398,19 @@ exports.buyCourse = async (req, res) => {
 // Verify payment and update status
 exports.verifyPayment = async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId } = req.body;
+    const { paymentIntentId, subcourseId } = req.body;
     const userId = req.userId;
     const io = req.app.get('io');
 
-    console.log('verifyPayment: Starting with inputs:', { userId, razorpayOrderId, razorpayPaymentId, subcourseId });
+    console.log('verifyPayment: Starting with inputs:', { userId, paymentIntentId, subcourseId });
 
     // Validate required fields
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !subcourseId) {
-      console.log('verifyPayment: Missing required fields:', { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId });
+    if (!paymentIntentId || !subcourseId) {
+      console.log('verifyPayment: Missing required fields:', { paymentIntentId, subcourseId });
       return apiResponse(res, {
         success: false,
         message: 'Missing required fields: ' +
-          (!razorpayOrderId ? 'razorpayOrderId ' : '') +
-          (!razorpayPaymentId ? 'razorpayPaymentId ' : '') +
-          (!razorpaySignature ? 'razorpaySignature ' : '') +
+          (!paymentIntentId ? 'paymentIntentId ' : '') +
           (!subcourseId ? 'subcourseId' : ''),
         statusCode: 400,
       });
@@ -433,23 +426,16 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Verify payment signature
-    const sign = `${razorpayOrderId}|${razorpayPaymentId}`;
-    console.log('verifyPayment: Generating signature for:', { sign });
-    const expectedSignature = crypto
-      .createHmac('sha256', razorpayInstance.key_secret)
-      .update(sign)
-      .digest('hex');
-
-    if (expectedSignature !== razorpaySignature) {
-      console.log('verifyPayment: Signature verification failed:', { expectedSignature, razorpaySignature });
+    // Verify payment with Stripe
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!intent || intent.status !== 'succeeded') {
       return apiResponse(res, {
         success: false,
-        message: 'Payment signature verification failed',
+        message: 'Payment is not completed',
         statusCode: 400,
       });
     }
-    console.log('verifyPayment: Payment signature verified successfully');
+    console.log('verifyPayment: Stripe payment verified successfully');
 
     // Fetch user and subcourse
     console.log('verifyPayment: Fetching user with ID:', userId);
@@ -468,8 +454,8 @@ exports.verifyPayment = async (req, res) => {
     console.log('verifyPayment: User and subcourse found:', { userId, subcourseId, subcourseName: subcourse.subcourseName });
 
     // Update userCourse with payment details
-    console.log('verifyPayment: Checking for existing userCourse:', { userId, subcourseId, razorpayOrderId });
-    let userCourse = await UserCourse.findOne({ userId, subcourseId, razorpayOrderId });
+    console.log('verifyPayment: Checking for existing userCourse:', { userId, subcourseId, paymentIntentId });
+    let userCourse = await UserCourse.findOne({ userId, subcourseId, stripePaymentIntentId: paymentIntentId });
     if (!userCourse) {
       console.log('verifyPayment: Creating new userCourse for:', { userId, subcourseId });
       userCourse = new UserCourse({
@@ -479,18 +465,18 @@ exports.verifyPayment = async (req, res) => {
         paymentStatus: true,
         isCompleted: false,
         progress: '0%',
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature,
+        stripePaymentIntentId: paymentIntentId,
+        stripeChargeId: intent.latest_charge ? String(intent.latest_charge) : undefined,
+        stripePaymentMethodId: intent.payment_method ? String(intent.payment_method) : undefined,
         paymentAmount: subcourse.certificatePrice || 0,
-        paymentCurrency: 'INR',
+        paymentCurrency: (intent.currency || 'usd').toUpperCase(),
         paymentDate: new Date(),
       });
     } else {
       console.log('verifyPayment: Updating existing userCourse:', { userCourseId: userCourse._id });
       userCourse.paymentStatus = true;
-      userCourse.razorpayPaymentId = razorpayPaymentId;
-      userCourse.razorpaySignature = razorpaySignature;
+      userCourse.stripeChargeId = intent.latest_charge ? String(intent.latest_charge) : userCourse.stripeChargeId;
+      userCourse.stripePaymentMethodId = intent.payment_method ? String(intent.payment_method) : userCourse.stripePaymentMethodId;
       userCourse.paymentDate = new Date();
     }
     await userCourse.save();
@@ -774,7 +760,7 @@ exports.verifyApplePurchase = async (req, res) => {
         appleTransactionId: payload.transactionId,
         appleProductId: payload.productId,
         paymentAmount: subcourse.certificatePrice || 0,
-        paymentCurrency: 'INR',
+        paymentCurrency: 'USD',
         paymentDate: new Date(payload.purchaseDate),
       });
     } else {
@@ -783,7 +769,7 @@ exports.verifyApplePurchase = async (req, res) => {
       userCourse.appleTransactionId = payload.transactionId;
       userCourse.appleProductId = payload.productId;
       userCourse.paymentAmount = subcourse.certificatePrice || 0;
-      userCourse.paymentCurrency = 'INR';
+      userCourse.paymentCurrency = 'USD';
       userCourse.paymentDate = new Date(payload.purchaseDate);
     }
 

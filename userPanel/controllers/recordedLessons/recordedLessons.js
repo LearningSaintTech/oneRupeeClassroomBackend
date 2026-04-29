@@ -3,9 +3,8 @@ const User = require('../../models/Auth/Auth');
 const Subcourse = require("../../../adminPanel/models/course/subcourse");
 const RecordedLesson = require('../../models/recordedLesson/recordedLesson');
 const { apiResponse } = require('../../../utils/apiResponse'); 
-const razorpayInstance = require('../../../config/razorpay');
+const stripe = require('../../../config/stripe');
 const NotificationService = require('../../../Notification/controller/notificationServiceController');
-const crypto = require("crypto");
 const fs = require('fs');
 const axios = require('axios');
 require("dotenv").config();
@@ -242,26 +241,18 @@ exports.buyRecordedLessons = async (req, res) => {
       });
     }
 
-    const currency = 'INR';
-    const receipt = `rcpt_rec_${userId.slice(-8)}_${subcourseId.slice(-8)}_${Date.now().toString().slice(-6)}`;
-    console.log('buyRecordedLessons: Generating Razorpay order with:', { amount, currency, receipt });
-
-    if (receipt.length > 40) {
-      console.log('buyRecordedLessons: Receipt length exceeds Razorpay limit:', { receipt, length: receipt.length });
-      return apiResponse(res, {
-        success: false,
-        message: 'Receipt length exceeds Razorpay limit',
-        statusCode: 400,
-      });
-    }
-
-    const order = await razorpayInstance.orders.create({
-      amount: Math.round(amount * 100), // Convert to paise
+    const currency = 'usd';
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
       currency,
-      receipt,
-      payment_capture: 1, // Auto-capture payment
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        subcourseId: String(subcourseId),
+        flow: 'recorded-lessons',
+      },
     });
-    console.log('buyRecordedLessons: Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+    console.log('buyRecordedLessons: Stripe payment intent created:', { paymentIntentId: paymentIntent.id, amount: paymentIntent.amount, currency: paymentIntent.currency });
 
     // Create or update RecordedLesson entry with payment details
     console.log('buyRecordedLessons: Checking for existing RecordedLesson:', { userId, subcourseId });
@@ -271,18 +262,18 @@ exports.buyRecordedLessons = async (req, res) => {
         userId,
         subcourseId,
         paymentStatus: false,
-        razorpayOrderId: order.id,
+        stripePaymentIntentId: paymentIntent.id,
         paymentAmount: amount,
-        paymentCurrency: currency,
+        paymentCurrency: currency.toUpperCase(),
       });
       await recordedLesson.save();
       console.log('buyRecordedLessons: RecordedLesson created:', { recordedLessonId: recordedLesson._id });
     } else {
       console.log('buyRecordedLessons: Updating existing RecordedLesson:', { recordedLessonId: existingRecordedLesson._id });
       existingRecordedLesson.paymentStatus = false;
-      existingRecordedLesson.razorpayOrderId = order.id;
+      existingRecordedLesson.stripePaymentIntentId = paymentIntent.id;
       existingRecordedLesson.paymentAmount = amount;
-      existingRecordedLesson.paymentCurrency = currency;
+      existingRecordedLesson.paymentCurrency = currency.toUpperCase();
       await existingRecordedLesson.save();
       console.log('buyRecordedLessons: RecordedLesson updated:', { recordedLessonId: existingRecordedLesson._id });
     }
@@ -293,10 +284,10 @@ exports.buyRecordedLessons = async (req, res) => {
       success: true,
       message: 'Order created successfully, proceed with payment',
       data: {
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        // key: razorpayInstance.key_id,
+        paymentIntentId: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency.toUpperCase(),
         recordedLesson: existingRecordedLesson,
       },
       statusCode: 200,
@@ -315,20 +306,18 @@ exports.buyRecordedLessons = async (req, res) => {
 // Verify recorded lessons payment and update status
 exports.verifyRecordedLessonsPayment = async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId } = req.body;
+    const { paymentIntentId, subcourseId } = req.body;
     const userId = req.userId;
 
-    console.log('verifyRecordedLessonsPayment: Starting with inputs:', { userId, razorpayOrderId, razorpayPaymentId, subcourseId });
+    console.log('verifyRecordedLessonsPayment: Starting with inputs:', { userId, paymentIntentId, subcourseId });
 
     // Validate required fields
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !subcourseId) {
-      console.log('verifyRecordedLessonsPayment: Missing required fields:', { razorpayOrderId, razorpayPaymentId, razorpaySignature, subcourseId });
+    if (!paymentIntentId || !subcourseId) {
+      console.log('verifyRecordedLessonsPayment: Missing required fields:', { paymentIntentId, subcourseId });
       return apiResponse(res, {
         success: false,
         message: 'Missing required fields: ' + 
-          (!razorpayOrderId ? 'razorpayOrderId ' : '') +
-          (!razorpayPaymentId ? 'razorpayPaymentId ' : '') +
-          (!razorpaySignature ? 'razorpaySignature ' : '') +
+          (!paymentIntentId ? 'paymentIntentId ' : '') +
           (!subcourseId ? 'subcourseId' : ''),
         statusCode: 400,
       });
@@ -344,23 +333,15 @@ exports.verifyRecordedLessonsPayment = async (req, res) => {
       });
     }
 
-    // Verify payment signature
-    const sign = `${razorpayOrderId}|${razorpayPaymentId}`;
-    console.log('verifyRecordedLessonsPayment: Generating signature for:', { sign });
-    const expectedSignature = crypto
-      .createHmac('sha256', razorpayInstance.key_secret)
-      .update(sign)
-      .digest('hex');
-
-    if (expectedSignature !== razorpaySignature) {
-      console.log('verifyRecordedLessonsPayment: Signature verification failed:', { expectedSignature, razorpaySignature });
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!intent || intent.status !== 'succeeded') {
       return apiResponse(res, {
         success: false,
-        message: 'Payment signature verification failed',
+        message: 'Payment is not completed',
         statusCode: 400,
       });
     }
-    console.log('verifyRecordedLessonsPayment: Payment signature verified successfully');
+    console.log('verifyRecordedLessonsPayment: Stripe payment verified successfully');
 
     // Fetch user and subcourse
     console.log('verifyRecordedLessonsPayment: Fetching user with ID:', userId);
@@ -379,8 +360,8 @@ exports.verifyRecordedLessonsPayment = async (req, res) => {
     console.log('verifyRecordedLessonsPayment: User and subcourse found:', { userId, subcourseId, subcourseName: subcourse.subcourseName });
 
     // Fetch and update RecordedLesson with payment details
-    console.log('verifyRecordedLessonsPayment: Checking for existing RecordedLesson:', { userId, subcourseId, razorpayOrderId });
-    const recordedLesson = await RecordedLesson.findOne({ userId, subcourseId, razorpayOrderId });
+    console.log('verifyRecordedLessonsPayment: Checking for existing RecordedLesson:', { userId, subcourseId, paymentIntentId });
+    const recordedLesson = await RecordedLesson.findOne({ userId, subcourseId, stripePaymentIntentId: paymentIntentId });
     if (!recordedLesson) {
       console.log('verifyRecordedLessonsPayment: RecordedLesson not found for this order');
       return apiResponse(res, {
@@ -392,8 +373,9 @@ exports.verifyRecordedLessonsPayment = async (req, res) => {
 
     console.log('verifyRecordedLessonsPayment: Updating existing RecordedLesson:', { recordedLessonId: recordedLesson._id });
     recordedLesson.paymentStatus = true;
-    recordedLesson.razorpayPaymentId = razorpayPaymentId;
-    recordedLesson.razorpaySignature = razorpaySignature;
+    recordedLesson.stripeChargeId = intent.latest_charge ? String(intent.latest_charge) : recordedLesson.stripeChargeId;
+    recordedLesson.stripePaymentMethodId = intent.payment_method ? String(intent.payment_method) : recordedLesson.stripePaymentMethodId;
+    recordedLesson.paymentCurrency = (intent.currency || 'usd').toUpperCase();
     recordedLesson.paymentDate = new Date();
     await recordedLesson.save();
     console.log('verifyRecordedLessonsPayment: RecordedLesson saved:', { recordedLessonId: recordedLesson._id, paymentStatus: recordedLesson.paymentStatus });
@@ -590,7 +572,7 @@ exports.verifyAppleRecordedLessons = async (req, res) => {
     // Update or create RecordedLesson with Apple IAP details
     console.log('verifyAppleRecordedLessons: Checking for existing RecordedLesson:', { userId, subcourseId });
     const paymentAmount = subcourse.recordedlessonsPrice || 0;
-    const paymentCurrency = 'INR'; // Apple IAP typically in USD
+    const paymentCurrency = 'USD';
 
     if (!existingRecordedLesson) {
       console.log('verifyAppleRecordedLessons: Creating new RecordedLesson for:', { userId, subcourseId });

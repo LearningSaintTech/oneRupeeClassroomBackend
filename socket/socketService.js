@@ -1,6 +1,6 @@
 import io from 'socket.io-client';
 
-const socket = io('https://main.learningsaint.com', {
+const socket = io('http://172.24.112.1:3000', {
   transports: ['websocket'],
   autoConnect: false,
 });
