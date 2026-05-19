@@ -42,6 +42,7 @@ const activityRoutes = require("./adminPanel/routes/activityRoutes");
 const userActivityRoutes = require("./userPanel/routes/activityRoutes")
 const chatBotRoutes = require("./AI-Chatbot/routes/chatRoutes")
 const { handleStripeWebhook } = require('./userPanel/controllers/payments/stripeWebhookController');
+const userDeletionRoutes = require('./userPanel/routes/userDeletionRoutes');
 
 
 require('dotenv').config();
@@ -133,6 +134,7 @@ app.use(session({
 // User Routes
 // /api/auth -> mobile auth, email verification, and email-based auth
 app.use('/api/auth', authRoutes, verifyemailRoutes, userAuthRoutes);
+app.use('/api/user/data-deletion', userDeletionRoutes);
 app.use("/api/user/profile", profileRoutes);
 app.use("/api/user/course", userSideCourseRoutes, userCourseRoutes);
 app.use('/api/user/favorite', favouriteCourseRoutes);
