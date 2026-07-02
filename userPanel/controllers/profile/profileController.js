@@ -388,6 +388,7 @@ exports.updateUserProfile = async (req, res) => {
     const userId = req.userId;
     const {
       address,
+      name,
       fullName,
       gender,
       dateOfBirth,
@@ -421,18 +422,21 @@ exports.updateUserProfile = async (req, res) => {
         statusCode: 404,
       });
     }
-    // Update fullName in UserAuth if provided
-    if (fullName !== undefined) {
-      if (typeof fullName !== 'string' || fullName.trim() === '') {
-        console.log("Invalid fullName:", fullName);
+    const displayName = name !== undefined ? name : fullName;
+    // Update name/fullName in UserAuth if provided
+    if (displayName !== undefined) {
+      if (typeof displayName !== 'string' || displayName.trim() === '') {
+        console.log("Invalid name:", displayName);
         return apiResponse(res, {
           success: false,
-          message: 'Full name must be a non-empty string',
+          message: 'Name must be a non-empty string',
           statusCode: 400,
         });
       }
-      console.log("Updating fullName:", fullName);
-      user.fullName = fullName.trim();
+      console.log("Updating name:", displayName);
+      const trimmedName = displayName.trim();
+      user.fullName = trimmedName;
+      user.name = trimmedName;
       await user.save();
     }
     // Find or create profile
@@ -572,6 +576,7 @@ exports.updateUserProfile = async (req, res) => {
       success: true,
       message: userProfile.isNew ? 'User profile created successfully' : 'User profile updated successfully',
       data: {
+        name: user.name || user.fullName,
         fullName: user.fullName,
         ...userProfile.toObject() // Include all profile fields
       },
@@ -598,7 +603,7 @@ exports.getUserProfile = async (req, res) => {
             });
         }
         // Fetch UserAuth to get fullName and mobileNumber
-        const user = await UserAuth.findById(req.userId, 'fullName  email mobileNumber isEmailVerified');
+        const user = await UserAuth.findById(req.userId, 'name fullName email mobileNumber isEmailVerified');
         if (!user) {
             return apiResponse(res, {
                 success: false,
@@ -612,6 +617,7 @@ exports.getUserProfile = async (req, res) => {
         const profileData = {
             _id: profile ? profile._id : null,
             userId: req.userId,
+            name: user.name || user.fullName,
             fullName: user.fullName,
             mobileNumber: user.mobileNumber,
             profileImageUrl: profile ? profile.profileImageUrl : null,
@@ -654,7 +660,7 @@ exports.getUserbasicInfo = async (req, res) => {
       });
     }
     // Fetch UserAuth to get fullName
-    const user = await UserAuth.findById(req.userId, 'fullName');
+    const user = await UserAuth.findById(req.userId, 'name fullName');
     if (!user) {
       console.log("User not found for userId:", req.userId);
       return apiResponse(res, {
@@ -667,6 +673,7 @@ exports.getUserbasicInfo = async (req, res) => {
     const profile = await UserProfile.findOne({ userId: req.userId }, 'profileImageUrl');
     // Prepare response data
     const profileData = {
+      name: user.name || user.fullName,
       fullName: user.fullName,
       profileImageUrl: profile ? profile.profileImageUrl : null
     };
@@ -699,7 +706,7 @@ exports.getProfileInfo = async (req, res) => {
             });
         }
         // Fetch UserAuth to get fullName
-        const user = await UserAuth.findById(req.userId, 'fullName');
+        const user = await UserAuth.findById(req.userId, 'name fullName');
         if (!user) {
             return apiResponse(res, {
                 success: false,
@@ -712,7 +719,7 @@ exports.getProfileInfo = async (req, res) => {
         // Prepare response data
         const profileData = {
             profileImage: profile ? profile.profileImageUrl : null,
-            name: user.fullName,
+            name: user.name || user.fullName,
             email: profile ? profile.email : null
         };
         return apiResponse(res, {

@@ -71,6 +71,12 @@ const sendOtpEmail = async (email, otp, purpose) => {
 const hashToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
 
+const resolveUserName = (body = {}) => {
+  const value = body.name ?? body.fullName;
+  if (typeof value !== 'string') return '';
+  return value.trim();
+};
+
 const getDeviceId = (req) => {
   const raw =
     req.body?.deviceId ||
@@ -87,15 +93,16 @@ const getDeviceId = (req) => {
 // POST /user-auth/register/email
 exports.register = async (req, res) => {
   try {
-    const { fullName,  email, mobileNumber } = req.body;
-    console.log( "fullName", fullName);
-    console.log( "email", email);
-    console.log( "mobileNumber", mobileNumber); 
+    const { email, mobileNumber } = req.body;
+    const userName = resolveUserName(req.body);
+    console.log('name', userName);
+    console.log('email', email);
+    console.log('mobileNumber', mobileNumber);
 
-    if (!fullName || typeof fullName !== 'string') {
+    if (!userName) {
       return apiResponse(res, {
         success: false,
-        message: 'Full name is required',
+        message: 'Name is required',
         statusCode: 400,
       });
     }
@@ -162,12 +169,14 @@ exports.register = async (req, res) => {
           statusCode: 400,
         });
       }
-      user.fullName = fullName;
+      user.name = userName;
+      user.fullName = userName;
       user.mobileNumber = trimmedMobile;
       await user.save();
     } else {
       user = new User({
-        fullName,
+        name: userName,
+        fullName: userName,
         email: trimmedEmail,
         mobileNumber: trimmedMobile,
       });
@@ -191,7 +200,7 @@ exports.register = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'OTP sent for email registration',
-      data: { email: trimmedEmail, mobileNumber: trimmedMobile },
+      data: { name: userName, fullName: userName, email: trimmedEmail, mobileNumber: trimmedMobile },
       statusCode: 200,
     });
   } catch (error) {
@@ -261,7 +270,11 @@ exports.login = async (req, res) => {
     return apiResponse(res, {
       success: true,
       message: 'OTP sent for email login',
-      data: { email: trimmedEmail },
+      data: {
+        email: trimmedEmail,
+        name: user.name || user.fullName || '',
+        fullName: user.fullName || user.name || '',
+      },
       statusCode: 200,
     });
   } catch (error) {
@@ -340,6 +353,15 @@ exports.verifyOTP = async (req, res) => {
     // ✅ Verify email
     if (!user.isEmailVerified) {
       user.isEmailVerified = true;
+    }
+
+    if (!user.name && user.fullName) {
+      user.name = user.fullName;
+    } else if (!user.fullName && user.name) {
+      user.fullName = user.name;
+    }
+
+    if (user.isModified()) {
       await user.save();
     }
 
@@ -383,7 +405,10 @@ exports.verifyOTP = async (req, res) => {
       success: true,
       message: 'Email verified successfully',
       data: {
+        name: user.name || user.fullName,
+        fullName: user.fullName,
         email: trimmedEmail,
+        mobileNumber: user.mobileNumber,
         isEmailVerified: user.isEmailVerified,
         accessToken,
         refreshToken,
@@ -475,6 +500,8 @@ exports.refreshTokenHandler = async (req, res) => {
       success: true,
       message: 'Tokens refreshed successfully',
       data: {
+        name: user.name || user.fullName,
+        fullName: user.fullName,
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
         role: user.role,

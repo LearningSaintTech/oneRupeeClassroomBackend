@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+    },
     fullName: {
         type: String,
         required: [true, 'Full name is required'],
@@ -39,5 +42,14 @@ const userSchema = new mongoose.Schema({
 
         ]
 }, { timestamps: true });
+
+userSchema.pre('save', function syncNameFields(next) {
+    if (this.name && !this.fullName) {
+        this.fullName = this.name;
+    } else if (this.fullName && !this.name) {
+        this.name = this.fullName;
+    }
+    next();
+});
 
 module.exports = mongoose.model('User', userSchema);
